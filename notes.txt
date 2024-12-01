@@ -1,0 +1,19 @@
+src/
+├── __init__.py
+├── config/
+│   ├── __init__.py
+│   ├── colors.py        # Color definitions
+│   ├── constants.py     # Game constants
+│   └── settings.py      # Display/window settings
+├── game/
+│   ├── __init__.py
+│   ├── sequence.py      # DNA sequence generation
+│   ├── scoring.py       # Scoring system
+│   └── leaderboard.py   # Leaderboard functionality
+├── ui/
+│   ├── __init__.py
+│   ├── window.py        # Window management
+│   ├── drawing.py       # Drawing utilities
+│   ├── buttons.py       # Button handling
+│   └── screens.py       # Different game screens
+└── main.py             # Main game loop
