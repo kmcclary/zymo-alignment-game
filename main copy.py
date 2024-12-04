@@ -71,10 +71,11 @@ GENOME_ROW_LENGTH = 50
 NUM_GENOME_ROWS = 5
 ROW_SPACING = int(80 * SCALE_Y)
 
-
+DEADZONE = 0.2  # Adjust as needed
+STICK_SENSITIVITY = 10  # Adjust movement speed
 
 # Video file path
-video_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\zymologo.mov"
+video_path = "/Users/kylemcclary/Documents/seq_align_game-main/zymologo.mov"
 
 def play_video(video_path):
     clip = VideoFileClip(video_path)
@@ -237,30 +238,6 @@ def calculate_score(player_seq, genome_seq, alignment_start):
 async def main():
     global WIDTH, HEIGHT, SCALE_X, SCALE_Y, font, small_font, submit_button_rect, play_again_button_rect, window
 
-    # Add input cooldown variables
-    last_input_time = pygame.time.get_ticks()
-    input_cooldown = 500  # 500ms cooldown between inputs
-
-
-    # Movement timing variables
-    last_horizontal_movement_time = 0
-    last_vertical_movement_time = 0
-    base_horizontal_cooldown = 200  # Base cooldown values
-    base_vertical_cooldown = 300
-    horizontal_cooldown = base_horizontal_cooldown  # Current cooldown values
-    vertical_cooldown = base_vertical_cooldown
-
-    # Acceleration tracking
-    horizontal_hold_start = 0
-    vertical_hold_start = 0
-    last_x_direction = 0  # Track direction to detect changes
-    last_y_direction = 0
-    
-    # Acceleration parameters
-    min_horizontal_cooldown = 10  # Fastest possible movement speed
-    min_vertical_cooldown = 10
-    acceleration_time = 2000  # Time in ms over which to reach max speed
-
     clip = VideoFileClip(video_path)
     video_surface = pygame.Surface((WIDTH, HEIGHT))
     
@@ -270,8 +247,7 @@ async def main():
     playing_video = True
 
     while playing_video:
-        current_time = pygame.time.get_ticks()
-        t = (current_time - start_time) / 1000
+        t = (pygame.time.get_ticks() - start_time) / 1000
         if t >= video_duration:
             playing_video = False
             break
@@ -284,17 +260,6 @@ async def main():
         window.blit(video_surface, (0, 0))
         pygame.display.update()
         
-        # Only check for inputs if enough time has passed
-        if current_time - last_input_time >= input_cooldown:
-            # Check for controller button presses
-            if len(joysticks) > 0:
-                joystick = joysticks[0]
-                for i in range(joystick.get_numbuttons()):
-                    if joystick.get_button(i):
-                        playing_video = False
-                        last_input_time = current_time
-                        break
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -320,17 +285,6 @@ async def main():
     draw_start_screen()
     waiting_for_start = True
     while waiting_for_start:
-        current_time = pygame.time.get_ticks()
-        # Only check for inputs if enough time has passed
-        if current_time - last_input_time >= input_cooldown:
-            # Check for controller button presses
-            if len(joysticks) > 0:
-                joystick = joysticks[0]
-                for i in range(joystick.get_numbuttons()):
-                    if joystick.get_button(i):
-                        waiting_for_start = False
-                        last_input_time = current_time
-                        break
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -367,7 +321,6 @@ async def main():
 
     while running:
         if status == "playing":
-            current_time = pygame.time.get_ticks()
             draw_sequences(player_seq, genome_seq, alignment_start, selected_position)
             draw_buttons(clicked_button)
             elapsed_time = (pygame.time.get_ticks() - start_time) / 1000
@@ -375,77 +328,6 @@ async def main():
                 display_time = elapsed_time
             draw_text(f"Time: {display_time:.2f} sec", font, BLACK, window, 50 * SCALE_X, 600 * SCALE_Y)
             
-            if len(joysticks) > 0:
-                joystick = joysticks[0]
-                x_axis = joystick.get_axis(0)  # Left/Right
-                y_axis = joystick.get_axis(1)  # Up/Down
-
-                # Determine current x direction (-1, 0, or 1)
-                current_x_direction = 0
-                if abs(x_axis) > 0.4:
-                    current_x_direction = 1 if x_axis > 0 else -1
-
-                # Handle direction changes for horizontal movement
-                if current_x_direction != last_x_direction:
-                    if current_x_direction != 0:  # Started moving in a direction
-                        horizontal_hold_start = current_time
-                        horizontal_cooldown = base_horizontal_cooldown
-                    else:  # Stopped moving
-                        horizontal_cooldown = base_horizontal_cooldown
-                last_x_direction = current_x_direction
-
-                # Calculate horizontal acceleration if holding a direction
-                if current_x_direction != 0:
-                    hold_time = current_time - horizontal_hold_start
-                    if hold_time > 0:
-                        # Gradually decrease cooldown based on hold time
-                        progress = min(1.0, hold_time / acceleration_time)
-                        horizontal_cooldown = max(min_horizontal_cooldown,
-                            base_horizontal_cooldown - (base_horizontal_cooldown - min_horizontal_cooldown) * progress)
-
-                # Handle horizontal movement with current cooldown
-                if current_time - last_horizontal_movement_time >= horizontal_cooldown:
-                    if abs(x_axis) > 0.4:
-                        move_amount = 1
-                        if x_axis > 0:  # Moving right
-                            alignment_start = min(len(genome_seq) - len(player_seq), 
-                                            alignment_start + move_amount)
-                        else:  # Moving left
-                            alignment_start = max(0, alignment_start - move_amount)
-                        last_horizontal_movement_time = current_time
-
-                # Same logic for vertical movement
-                current_y_direction = 0
-                if abs(y_axis) > 0.9:
-                    current_y_direction = 1 if y_axis > 0 else -1
-
-                if current_y_direction != last_y_direction:
-                    if current_y_direction != 0:
-                        vertical_hold_start = current_time
-                        vertical_cooldown = base_vertical_cooldown
-                    else:
-                        vertical_cooldown = base_vertical_cooldown
-                last_y_direction = current_y_direction
-
-                if current_y_direction != 0:
-                    hold_time = current_time - vertical_hold_start
-                    if hold_time > 0:
-                        progress = min(1.0, hold_time / acceleration_time)
-                        vertical_cooldown = max(min_vertical_cooldown,
-                            base_vertical_cooldown - (base_vertical_cooldown - min_vertical_cooldown) * progress)
-
-                if current_time - last_vertical_movement_time >= vertical_cooldown:
-                    if abs(y_axis) > 0.9:
-                        move_amount = 1
-                        if y_axis > 0:  # Moving down
-                            new_pos = alignment_start + move_amount * GENOME_ROW_LENGTH
-                            alignment_start = min(len(genome_seq) - len(player_seq), new_pos)
-                        else:  # Moving up
-                            new_pos = alignment_start - move_amount * GENOME_ROW_LENGTH
-                            alignment_start = max(0, new_pos)
-                        last_vertical_movement_time = current_time
-
-
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -513,6 +395,44 @@ async def main():
                         alignment_start = max(0, alignment_start - GENOME_ROW_LENGTH)
                     elif event.key == pygame.K_s:
                         alignment_start = min(len(genome_seq) - len(player_seq), alignment_start + GENOME_ROW_LENGTH)
+
+                    if len(joysticks) > 0:
+                        # Left analog stick for movement
+                        x_axis = joysticks[0].get_axis(0)  # Left/Right
+                        y_axis = joysticks[0].get_axis(1)  # Up/Down
+                        
+                        # Apply deadzone
+                        if abs(x_axis) > DEADZONE:
+                            if x_axis > 0:
+                                # D key functionality (move right)
+                                alignment_start = min(len(genome_seq) - len(player_seq), 
+                                                alignment_start + STICK_SENSITIVITY * abs(x_axis))
+                            else:
+                                # A key functionality (move left)
+                                alignment_start = max(0, 
+                                                alignment_start - STICK_SENSITIVITY * abs(x_axis))
+                        
+                        if abs(y_axis) > DEADZONE:
+                            if y_axis > 0:
+                                # S key functionality (move down)
+                                alignment_start = min(len(genome_seq) - len(player_seq),
+                                                alignment_start + GENOME_ROW_LENGTH)
+                            else:
+                                # W key functionality (move up)
+                                alignment_start = max(0, 
+                                                alignment_start - GENOME_ROW_LENGTH)
+                        
+                        # D-pad can be used as an alternative to analog stick
+                        if event.type == pygame.JOYBUTTONDOWN:
+                            if event.button == 13:  # D-pad left
+                                alignment_start = max(0, alignment_start - 1)
+                            elif event.button == 14:  # D-pad right
+                                alignment_start = min(len(genome_seq) - len(player_seq), alignment_start + 1)
+                            elif event.button == 11:  # D-pad up
+                                alignment_start = max(0, alignment_start - GENOME_ROW_LENGTH)
+                            elif event.button == 12:  # D-pad down
+                                alignment_start = min(len(genome_seq) - len(player_seq), alignment_start + GENOME_ROW_LENGTH)
+
 
 
                 elif event.type == pygame.VIDEORESIZE:
