@@ -38,8 +38,8 @@ submit_button_rect = pygame.Rect(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCA
 play_again_button_rect = pygame.Rect(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
 
 # Fonts - scale with window size
-font_size = int(24 * min(SCALE_X, SCALE_Y))
-small_font_size = int(16 * min(SCALE_X, SCALE_Y))
+font_size = int(48 * min(SCALE_X, SCALE_Y))
+small_font_size = int(32 * min(SCALE_X, SCALE_Y))
 font = pygame.font.SysFont('Arial', font_size)
 small_font = pygame.font.SysFont('Arial', small_font_size)
 
@@ -53,11 +53,11 @@ GREEN = (0, 255, 0)
 
 # Colors for nucleotides
 COLORS = {
-    'A': (255, 0, 0),  # Red
-    'T': (0, 255, 0),  # Green
-    'G': (0, 0, 255),  # Blue
-    'C': (255, 255, 0),  # Yellow
-    '-': (100, 100, 100)  # Gray for gaps
+    'A': (220, 20, 60),   # Crimson red
+    'T': (46, 139, 87),   # Sea green
+    'G': (25, 25, 112),   # Midnight blue
+    'C': (218, 165, 32),  # Golden rod
+    '-': (128, 128, 128)  # Gray for gaps
 }
 
 # Scoring values
@@ -67,11 +67,14 @@ GAP_OPENING = -2
 GAP_EXTENSION = -1
 
 # Display dimensions for genome sequence
-GENOME_ROW_LENGTH = 50
-NUM_GENOME_ROWS = 5
-ROW_SPACING = int(80 * SCALE_Y)
+GENOME_ROW_LENGTH = 38
+NUM_GENOME_ROWS = 8
+ROW_SPACING = int(200 * SCALE_Y)
 
-
+BUTTON_A = 0  # Typically the A button is index 0
+BUTTON_B = 1  # Typically the B button is index 1
+BUTTON_Y = 3 
+BUTTON_X = 2
 
 # Video file path
 video_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\zymologo.mov"
@@ -113,67 +116,179 @@ def generate_player_sequence_from_genome(genome_seq):
     return ''.join(player_seq)
 
 def draw_sequences(player_seq, genome_seq, alignment_start, selected_position):
-    window.fill(WHITE, (0, 0, WIDTH, HEIGHT - 200 * SCALE_Y))
-
-    y_offset = 50 * SCALE_Y
-    char_spacing = 15 * SCALE_X
-
+    # Clear the main game area
+    window.fill(WHITE)
+    
+    # Calculate optimal spacing and positioning
+    char_width = 40 * SCALE_X
+    char_height = 60 * SCALE_Y
+    
+    # Calculate total width needed for sequence display
+    sequence_width = GENOME_ROW_LENGTH * char_width
+    
+    # Center the sequences horizontally
+    x_start = (WIDTH - sequence_width) / 2
+    y_start = 50 * SCALE_Y  # Starting position from top
+    
+    # Adjust row spacing for better vertical distribution
+    row_spacing = (HEIGHT - 300 * SCALE_Y) / (6)
+    
+    # Draw genome sequence with improved spacing
     for row in range(NUM_GENOME_ROWS):
         start_idx = row * GENOME_ROW_LENGTH
         end_idx = start_idx + GENOME_ROW_LENGTH
         genome_subseq = genome_seq[start_idx:end_idx]
+        
+        # Draw row label
+        label_x = x_start - 140 * SCALE_X
+        row_y = y_start + row * row_spacing
+        draw_text(f"Genome:", small_font, BLACK, window, label_x, row_y)
+        
+        # Draw sequence
         for i, base in enumerate(genome_subseq):
+            x_pos = x_start + i * char_width
             color = COLORS[base]
-            draw_text(base, font, color, window, 50 * SCALE_X + i * char_spacing, y_offset + row * ROW_SPACING)
+            draw_text(base, font, color, window, x_pos, row_y)
+            
+            # Draw selection box if position is selected and aligns with read sequence
+            if (selected_position is not None and 
+                selected_position == start_idx + i and 
+                alignment_start <= selected_position < alignment_start + len(player_seq)):
+                pygame.draw.rect(window, BLACK, 
+                               (x_pos - 2, row_y + 43, 
+                                char_width, char_height * 0.7), 1)
 
-    player_seq_y_offset = y_offset + 35 * SCALE_Y
+    # Draw player sequence with improved positioning
+    player_seq_y_offset = 40 * SCALE_Y
+    
+    # Calculate which rows the player sequence spans
+    player_start_row = alignment_start // GENOME_ROW_LENGTH
+    player_end_row = (alignment_start + len(player_seq) - 1) // GENOME_ROW_LENGTH
+    
     for row in range(NUM_GENOME_ROWS):
-        start_idx = row * GENOME_ROW_LENGTH
-        end_idx = start_idx + GENOME_ROW_LENGTH
-        alignment_end = alignment_start + len(player_seq) - 1
-        if alignment_start >= start_idx and alignment_start <= end_idx:
-            player_subseq = player_seq[:end_idx-alignment_start]
+        row_start_idx = row * GENOME_ROW_LENGTH
+        row_end_idx = row_start_idx + GENOME_ROW_LENGTH
+        row_y = y_start + row * row_spacing
+        
+        # Draw row label for each row that contains part of the player sequence
+        if row >= player_start_row and row <= player_end_row:
+            label_x = x_start - 140 * SCALE_X
+            draw_text("Read:", small_font, BLACK, window, label_x, row_y + player_seq_y_offset)
+        
+        # Calculate the portion of player sequence that belongs in this row
+        if row_start_idx <= alignment_start < row_end_idx:
+            # First row of player sequence
+            bases_in_row = min(row_end_idx - alignment_start, len(player_seq))
+            player_subseq = player_seq[:bases_in_row]
+            offset = alignment_start - row_start_idx
             for i, base in enumerate(player_subseq):
                 color = COLORS[base]
-                draw_text(base, font, color, window, 50 * SCALE_X + (i+alignment_start-start_idx) * char_spacing, 
-                         player_seq_y_offset + row * ROW_SPACING)
-        elif alignment_end >= start_idx and alignment_end <= end_idx:
-            player_subseq = player_seq[start_idx-alignment_start:]
+                x_pos = x_start + (offset + i) * char_width
+                draw_text(base, font, color, window, x_pos, row_y + player_seq_y_offset)
+        
+        elif alignment_start <= row_start_idx < alignment_start + len(player_seq):
+            # Middle or last row of player sequence
+            seq_offset = row_start_idx - alignment_start
+            bases_in_row = min(GENOME_ROW_LENGTH, len(player_seq) - seq_offset)
+            player_subseq = player_seq[seq_offset:seq_offset + bases_in_row]
             for i, base in enumerate(player_subseq):
                 color = COLORS[base]
-                draw_text(base, font, color, window, 50 * SCALE_X + i * char_spacing, 
-                         player_seq_y_offset + row * ROW_SPACING)
+                x_pos = x_start + i * char_width
+                draw_text(base, font, color, window, x_pos, row_y + player_seq_y_offset)
 
-    score = calculate_score(player_seq, genome_seq, alignment_start)
-    score_text = font.render(f"Score: {score}", True, BLACK)
-    window.blit(score_text, (50 * SCALE_X, y_offset + NUM_GENOME_ROWS * ROW_SPACING + 50 * SCALE_Y))
-
-    if selected_position is not None:
-        row = selected_position // GENOME_ROW_LENGTH
-        col = selected_position % GENOME_ROW_LENGTH
-        pygame.draw.rect(window, BLACK, (50 * SCALE_X + col * char_spacing, 
-                                       85 * SCALE_Y + row * ROW_SPACING, 
-                                       16 * SCALE_X, 30 * SCALE_Y), 1)
-    pygame.display.update()
-
-def draw_buttons(clicked_button):
-    window.fill(WHITE, (0, HEIGHT - 200 * SCALE_Y, WIDTH, HEIGHT))
+def draw_buttons(clicked_button, score):
+    # Create footer section for buttons and instructions
+    footer_height = 120 * SCALE_Y  # Reduced height
+    footer_y = HEIGHT - footer_height
+    
+    # Clear the footer area
+    window.fill(WHITE, (0, footer_y, WIDTH, footer_height))
+    
+    # Calculate widths for layout
+    button_width = 160 * SCALE_X
+    button_height = 50 * SCALE_Y
+    instructions_width = 600 * SCALE_X
+    score_width = 200 * SCALE_X
+    
+    # Layout: [Score] [Submit] [Play Again] [Instructions Panel]
+    total_width = score_width + button_width * 2 + instructions_width + 120 * SCALE_X  # Add spacing
+    start_x = (WIDTH - total_width) / 2
+    
+    # Draw score panel
+    score_rect = pygame.Rect(start_x, footer_y + (footer_height - button_height) / 2, 
+                           score_width, button_height)
+    pygame.draw.rect(window, LIGHT_BLUE, score_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
+    score_text = f"Score: {score}"
+    score_text_width = font.size(score_text)[0]
+    draw_text(score_text, font, BLACK, window,
+              score_rect.x + (score_width - score_text_width) / 2,
+              score_rect.y + (button_height - font_size) / 2)
+    
+    # Update button rectangles with new positions
+    submit_button_rect.update(start_x + score_width + 20 * SCALE_X,
+                            footer_y + (footer_height - button_height) / 2, 
+                            button_width, button_height)
+    play_again_button_rect.update(submit_button_rect.right + 20 * SCALE_X, 
+                                footer_y + (footer_height - button_height) / 2,
+                                button_width, button_height)
+    
+    # Draw buttons
     if clicked_button == "submit":
-        pygame.draw.rect(window, (0, 200, 0), submit_button_rect)
+        pygame.draw.rect(window, (0, 200, 0), submit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
     else:
-        pygame.draw.rect(window, GREEN, submit_button_rect)
+        pygame.draw.rect(window, GREEN, submit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
 
     if clicked_button == "play_again":
-        pygame.draw.rect(window, (0, 0, 200), play_again_button_rect)
+        pygame.draw.rect(window, (0, 0, 200), play_again_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
     else:
-        pygame.draw.rect(window, BLUE, play_again_button_rect)
+        pygame.draw.rect(window, BLUE, play_again_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
     
-    draw_text("Submit", font, BLACK, window, submit_button_rect.x + 50 * SCALE_X, submit_button_rect.y + 10 * SCALE_Y)
-    draw_text("Play Again", font, WHITE, window, play_again_button_rect.x + 25 * SCALE_X, play_again_button_rect.y + 10 * SCALE_Y)
-    draw_text("A/W/S/D: move the read", small_font, BLACK, window, 550 * SCALE_X, 600 * SCALE_Y)
-    draw_text("Arrow keys: move the cursor", small_font, BLACK, window, 550 * SCALE_X, 650 * SCALE_Y)
-    draw_text("Space: add a gap", small_font, BLACK, window, 550 * SCALE_X, 700 * SCALE_Y)
-    draw_text("Backspace: delete a gap", small_font, BLACK, window, 550 * SCALE_X, 750 * SCALE_Y)
+    # Center text within buttons
+    submit_text = "Submit"
+    play_again_text = "Play Again"
+    submit_width = font.size(submit_text)[0]
+    play_again_width = font.size(play_again_text)[0]
+    
+    draw_text(submit_text, font, BLACK, window, 
+              submit_button_rect.x + (button_width - submit_width) / 2,
+              submit_button_rect.y + (button_height - font_size) / 2)
+    draw_text(play_again_text, font, WHITE, window,
+              play_again_button_rect.x + (button_width - play_again_width) / 2,
+              play_again_button_rect.y + (button_height - font_size) / 2)
+    
+    # Draw instructions panel
+    instructions_x = play_again_button_rect.right + 40 * SCALE_X
+    instructions_height = footer_height - 20 * SCALE_Y
+    instructions_y = footer_y + 10 * SCALE_Y
+    
+    # Draw panel background
+    pygame.draw.rect(window, LIGHT_BLUE,
+                    (instructions_x, instructions_y,
+                     instructions_width, instructions_height),
+                    border_radius=int(10 * min(SCALE_X, SCALE_Y)))
+    
+    # Draw instructions in two columns
+    instructions = [
+        [("Movement Controls:", BLACK),
+         ("• A/D: Move read left/right", BLUE),
+         ("• W/S: Move read up/down", BLUE)],
+        [("Editing Controls:", BLACK),
+         ("• Space: Add gap at cursor", RED),
+         ("• Backspace: Delete gap", RED),
+         ("• Arrow Keys: Move cursor", GREEN)]
+    ]
+    
+    # Calculate column widths and positions
+    col_width = instructions_width / 2
+    for col_idx, column in enumerate(instructions):
+        x_offset = instructions_x + col_idx * col_width + 20 * SCALE_X
+        instruction_y = instructions_y + 15 * SCALE_Y
+        
+        for text, color in column:
+            draw_text(text, small_font, color, window, x_offset, instruction_y)
+            instruction_y += 25 * SCALE_Y
+    
+    pygame.display.update()
 
 def draw_leaderboard(leaderboard, score, time, name, status, clicked_button):
     window.fill(WHITE)
@@ -260,6 +375,24 @@ async def main():
     min_horizontal_cooldown = 10  # Fastest possible movement speed
     min_vertical_cooldown = 10
     acceleration_time = 2000  # Time in ms over which to reach max speed
+
+    # D-pad timing variables
+    last_dpad_horizontal_movement_time = 0
+    last_dpad_vertical_movement_time = 0
+    dpad_horizontal_cooldown = base_horizontal_cooldown
+    dpad_vertical_cooldown = base_vertical_cooldown
+    dpad_horizontal_hold_start = 0
+    dpad_vertical_hold_start = 0
+    last_dpad_x_direction = 0
+    last_dpad_y_direction = 0
+
+
+    # First, add these variables at the start of your main() function with your other timing variables:
+    button_a_last_press = 0
+    button_b_last_press = 0
+    button_x_last_press = 0
+    button_cooldown = 300  # 300ms = 0.3 seconds
+
 
     clip = VideoFileClip(video_path)
     video_surface = pygame.Surface((WIDTH, HEIGHT))
@@ -369,12 +502,12 @@ async def main():
         if status == "playing":
             current_time = pygame.time.get_ticks()
             draw_sequences(player_seq, genome_seq, alignment_start, selected_position)
-            draw_buttons(clicked_button)
+            score = calculate_score(player_seq, genome_seq, alignment_start)
+            draw_buttons(clicked_button, score)  # Pass the score to draw_buttons
             elapsed_time = (pygame.time.get_ticks() - start_time) / 1000
             if elapsed_time - display_time >= 0.1:
                 display_time = elapsed_time
-            draw_text(f"Time: {display_time:.2f} sec", font, BLACK, window, 50 * SCALE_X, 600 * SCALE_Y)
-            
+            draw_text(f"Time: {display_time:.2f} sec", font, BLACK, window, 50 * SCALE_X, 600 * SCALE_Y)            
             if len(joysticks) > 0:
                 joystick = joysticks[0]
                 x_axis = joystick.get_axis(0)  # Left/Right
@@ -445,6 +578,185 @@ async def main():
                             alignment_start = max(0, new_pos)
                         last_vertical_movement_time = current_time
 
+            if len(joysticks) > 0:
+                joystick = joysticks[0]
+                # Handle analog stick
+                x_axis = joystick.get_axis(0)  # Left/Right
+                y_axis = joystick.get_axis(1)  # Up/Down
+
+                # Handle analog stick movement (your existing code)
+                current_x_direction = 0
+                if abs(x_axis) > 0.4:
+                    current_x_direction = 1 if x_axis > 0 else -1
+
+                if current_x_direction != last_x_direction:
+                    if current_x_direction != 0:
+                        horizontal_hold_start = current_time
+                        horizontal_cooldown = base_horizontal_cooldown
+                    else:
+                        horizontal_cooldown = base_horizontal_cooldown
+                last_x_direction = current_x_direction
+
+                if current_x_direction != 0:
+                    hold_time = current_time - horizontal_hold_start
+                    if hold_time > 0:
+                        progress = min(1.0, hold_time / acceleration_time)
+                        horizontal_cooldown = max(min_horizontal_cooldown,
+                            base_horizontal_cooldown - (base_horizontal_cooldown - min_horizontal_cooldown) * progress)
+
+                # Handle analog horizontal movement with cooldown
+                if current_time - last_horizontal_movement_time >= horizontal_cooldown:
+                    if abs(x_axis) > 0.4:
+                        move_amount = 1
+                        if x_axis > 0:
+                            alignment_start = min(len(genome_seq) - len(player_seq), 
+                                            alignment_start + move_amount)
+                        else:
+                            alignment_start = max(0, alignment_start - move_amount)
+                        last_horizontal_movement_time = current_time
+
+                # Handle analog vertical movement (your existing code)
+                current_y_direction = 0
+                if abs(y_axis) > 0.9:
+                    current_y_direction = 1 if y_axis > 0 else -1
+
+                if current_y_direction != last_y_direction:
+                    if current_y_direction != 0:
+                        vertical_hold_start = current_time
+                        vertical_cooldown = base_vertical_cooldown
+                    else:
+                        vertical_cooldown = base_vertical_cooldown
+                last_y_direction = current_y_direction
+
+                if current_y_direction != 0:
+                    hold_time = current_time - vertical_hold_start
+                    if hold_time > 0:
+                        progress = min(1.0, hold_time / acceleration_time)
+                        vertical_cooldown = max(min_vertical_cooldown,
+                            base_vertical_cooldown - (base_vertical_cooldown - min_vertical_cooldown) * progress)
+
+                if current_time - last_vertical_movement_time >= vertical_cooldown:
+                    if abs(y_axis) > 0.9:
+                        move_amount = 1
+                        if y_axis > 0:
+                            new_pos = alignment_start + move_amount * GENOME_ROW_LENGTH
+                            alignment_start = min(len(genome_seq) - len(player_seq), new_pos)
+                        else:
+                            new_pos = alignment_start - move_amount * GENOME_ROW_LENGTH
+                            alignment_start = max(0, new_pos)
+                        last_vertical_movement_time = current_time
+
+                # Handle D-pad with acceleration
+                dpad_x, dpad_y = joystick.get_hat(0)
+                
+                # Handle D-pad horizontal movement
+                current_dpad_x_direction = dpad_x
+                if current_dpad_x_direction != last_dpad_x_direction:
+                    if current_dpad_x_direction != 0:
+                        dpad_horizontal_hold_start = current_time
+                        dpad_horizontal_cooldown = base_horizontal_cooldown
+                    else:
+                        dpad_horizontal_cooldown = base_horizontal_cooldown
+                last_dpad_x_direction = current_dpad_x_direction
+
+                if current_dpad_x_direction != 0:
+                    hold_time = current_time - dpad_horizontal_hold_start
+                    if hold_time > 0:
+                        progress = min(1.0, hold_time / acceleration_time)
+                        dpad_horizontal_cooldown = max(min_horizontal_cooldown,
+                            base_horizontal_cooldown - (base_horizontal_cooldown - min_horizontal_cooldown) * progress)
+
+                # Apply D-pad horizontal movement with cooldown
+                if current_time - last_dpad_horizontal_movement_time >= dpad_horizontal_cooldown:
+                    if dpad_x != 0:
+                        if dpad_x < 0:  # D-pad Left
+                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                selected_position = alignment_start + len(player_seq) - 1
+                            elif selected_position > alignment_start:
+                                selected_position -= 1
+                        else:  # D-pad Right
+                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                selected_position = alignment_start
+                            elif selected_position < alignment_start + len(player_seq) - 1:
+                                selected_position += 1
+                        last_dpad_horizontal_movement_time = current_time
+
+                # Handle D-pad vertical movement
+                current_dpad_y_direction = dpad_y
+                if current_dpad_y_direction != last_dpad_y_direction:
+                    if current_dpad_y_direction != 0:
+                        dpad_vertical_hold_start = current_time
+                        dpad_vertical_cooldown = base_vertical_cooldown
+                    else:
+                        dpad_vertical_cooldown = base_vertical_cooldown
+                last_dpad_y_direction = current_dpad_y_direction
+
+                if current_dpad_y_direction != 0:
+                    hold_time = current_time - dpad_vertical_hold_start
+                    if hold_time > 0:
+                        progress = min(1.0, hold_time / acceleration_time)
+                        dpad_vertical_cooldown = max(min_vertical_cooldown,
+                            base_vertical_cooldown - (base_vertical_cooldown - min_vertical_cooldown) * progress)
+
+                # Apply D-pad vertical movement with cooldown
+                if current_time - last_dpad_vertical_movement_time >= dpad_vertical_cooldown:
+                    if dpad_y != 0:
+                        if dpad_y > 0:  # D-pad Up
+                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                selected_position = alignment_start
+                            elif selected_position - GENOME_ROW_LENGTH >= alignment_start:
+                                selected_position -= GENOME_ROW_LENGTH
+                        else:  # D-pad Down
+                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                selected_position = alignment_start + len(player_seq) - 1
+                            elif selected_position + GENOME_ROW_LENGTH < alignment_start + len(player_seq):
+                                selected_position += GENOME_ROW_LENGTH
+                        last_dpad_vertical_movement_time = current_time
+
+                # Handle A button (spacebar equivalent) with cooldown
+                if joystick.get_button(BUTTON_A) and selected_position is not None:
+                    current_time = pygame.time.get_ticks()
+                    if current_time - button_a_last_press >= button_cooldown:
+                        if selected_position >= alignment_start and selected_position < alignment_start + len(player_seq) - 1:
+                            player_seq = player_seq[:selected_position-alignment_start] + '-' + player_seq[selected_position-alignment_start:]
+                            button_a_last_press = current_time
+
+                # Handle B button (delete equivalent) with cooldown
+                if joystick.get_button(BUTTON_B) and selected_position is not None:
+                    current_time = pygame.time.get_ticks()
+                    if current_time - button_b_last_press >= button_cooldown:
+                        if selected_position >= alignment_start and selected_position < alignment_start + len(player_seq) - 1:
+                            if player_seq[selected_position-alignment_start] == '-':
+                                player_seq = player_seq[:selected_position-alignment_start] + player_seq[selected_position-alignment_start+1:]
+                                button_b_last_press = current_time
+
+                if joystick.get_button(BUTTON_Y):
+                    clicked_button = "submit"
+                    status = "score"
+                    final_score = calculate_score(player_seq, genome_seq, alignment_start)
+                    final_time = elapsed_time
+                    if len(leaderboard) < 10 or final_score > leaderboard[-1]["score"] or (final_score == leaderboard[-1]["score"] and final_time < leaderboard[-1]["time"]):
+                        status = "won"
+                        input_active = True
+                    else:
+                        status = "lost"
+
+                if joystick.get_button(BUTTON_X):
+                    current_time = pygame.time.get_ticks()
+                    if current_time - button_x_last_press >= button_cooldown:
+                        clicked_button = "play_again"
+                        genome_seq = generate_dna_sequence(250)
+                        player_seq = generate_player_sequence_from_genome(genome_seq)
+                        alignment_start = 0
+                        selected_position = None
+                        start_time = pygame.time.get_ticks()
+                        display_time = 0
+                        final_score = 0
+                        final_time = 10000
+                        player_name = ""
+                        status = "playing"
+                        input_active = False
+                        button_x_last_press = current_time
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -485,25 +797,25 @@ async def main():
                                 player_seq = player_seq[:selected_position-alignment_start] + player_seq[selected_position-alignment_start+1:]
 
                     if event.key == pygame.K_LEFT:
-                        if selected_position is None:
-                            selected_position = len(genome_seq) - 1
-                        else:
-                            selected_position = max(0, selected_position - 1)
+                        if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                            selected_position = alignment_start + len(player_seq) - 1
+                        elif selected_position > alignment_start:
+                            selected_position -= 1
                     elif event.key == pygame.K_RIGHT:
-                        if selected_position is None:
-                            selected_position = 0
-                        else:
-                            selected_position = min(len(genome_seq) - 1, selected_position + 1)
+                        if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                            selected_position = alignment_start
+                        elif selected_position < alignment_start + len(player_seq) - 1:
+                            selected_position += 1
                     elif event.key == pygame.K_UP:
-                        if selected_position is None:
-                            selected_position = len(genome_seq) - 1
-                        else:
-                            selected_position = max(0, selected_position - GENOME_ROW_LENGTH)
+                        if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                            selected_position = alignment_start
+                        elif selected_position - GENOME_ROW_LENGTH >= alignment_start:
+                            selected_position -= GENOME_ROW_LENGTH
                     elif event.key == pygame.K_DOWN:
-                        if selected_position is None:
-                            selected_position = 0
-                        else:
-                            selected_position = min(len(genome_seq) - 1, selected_position + GENOME_ROW_LENGTH)
+                        if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                            selected_position = alignment_start + len(player_seq) - 1
+                        elif selected_position + GENOME_ROW_LENGTH < alignment_start + len(player_seq):
+                            selected_position += GENOME_ROW_LENGTH
 
                     if event.key == pygame.K_a:
                         alignment_start = max(0, alignment_start - 1)
@@ -529,7 +841,25 @@ async def main():
         else:
             draw_leaderboard(leaderboard, final_score, final_time, player_name, status, clicked_button)
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
+                if len(joysticks) > 0:
+                    joystick = joysticks[0]
+                    if joystick.get_button(BUTTON_X):
+                        current_time = pygame.time.get_ticks()
+                        if current_time - button_x_last_press >= button_cooldown:
+                            clicked_button = "play_again"
+                            genome_seq = generate_dna_sequence(250)
+                            player_seq = generate_player_sequence_from_genome(genome_seq)
+                            alignment_start = 0
+                            selected_position = None
+                            start_time = pygame.time.get_ticks()
+                            display_time = 0
+                            final_score = 0
+                            final_time = 10000
+                            player_name = ""
+                            status = "playing"
+                            input_active = False
+                            button_x_last_press = current_time
+                elif event.type == pygame.QUIT:
                     running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     mouse_pos = pygame.mouse.get_pos()
