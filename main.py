@@ -3,6 +3,7 @@ import random
 import asyncio
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import pygame.joystick
+import math
 
 # Initialize pygame
 pygame.init()
@@ -115,7 +116,36 @@ def generate_player_sequence_from_genome(genome_seq):
 
     return ''.join(player_seq)
 
-def draw_sequences(player_seq, genome_seq, alignment_start, selected_position):
+def create_glow_surface(text, font, color, alpha):
+    # Create text surface with the base color
+    text_surface = font.render(text, True, color)
+    
+    # Create a surface for the glow effect with alpha channel
+    glow_surface = pygame.Surface(text_surface.get_size(), pygame.SRCALPHA)
+    
+    # Create a larger surface for the blur effect
+    blur_size = 2
+    blur_surface = pygame.Surface((text_surface.get_width() + blur_size * 1.5, 
+                                 text_surface.get_height() + blur_size * 2), 
+                                pygame.SRCALPHA)
+    
+    # Draw the text multiple times with slight offsets for blur effect
+    for offset in range(blur_size):
+        for x in range(-offset, offset + 1):
+            for y in range(-offset, offset + 1):
+                blur_surface.blit(text_surface, 
+                                (blur_size + x, blur_size + y))
+    
+    # Scale the blur effect's alpha
+    blur_surface.fill((0, 0, 0, alpha), special_flags=pygame.BLEND_RGBA_MULT)
+    
+    # Combine the glow and text
+    glow_surface.blit(blur_surface, (-blur_size, -blur_size))
+    glow_surface.blit(text_surface, (0, 0))
+    
+    return glow_surface
+
+def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time):
     # Clear the main game area
     window.fill(WHITE)
     
@@ -128,12 +158,15 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position):
     
     # Center the sequences horizontally
     x_start = (WIDTH - sequence_width) / 2
-    y_start = 50 * SCALE_Y  # Starting position from top
+    y_start = 50 * SCALE_Y
     
     # Adjust row spacing for better vertical distribution
     row_spacing = (HEIGHT - 300 * SCALE_Y) / (6)
+
+    # Calculate glow alpha using sine wave for animation
+    glow_alpha = int(128 + 64 * math.sin(current_time * 0.004))  # Adjust speed with multiplier
     
-    # Draw genome sequence with improved spacing
+    # Draw genome sequence
     for row in range(NUM_GENOME_ROWS):
         start_idx = row * GENOME_ROW_LENGTH
         end_idx = start_idx + GENOME_ROW_LENGTH
@@ -150,51 +183,57 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position):
             color = COLORS[base]
             draw_text(base, font, color, window, x_pos, row_y)
             
-            # Draw selection box if position is selected and aligns with read sequence
             if (selected_position is not None and 
                 selected_position == start_idx + i and 
                 alignment_start <= selected_position < alignment_start + len(player_seq)):
                 pygame.draw.rect(window, BLACK, 
                                (x_pos - 2, row_y + 43, 
                                 char_width, char_height * 0.7), 1)
-
-    # Draw player sequence with improved positioning
-    player_seq_y_offset = 40 * SCALE_Y
     
-    # Calculate which rows the player sequence spans
-    player_start_row = alignment_start // GENOME_ROW_LENGTH
-    player_end_row = (alignment_start + len(player_seq) - 1) // GENOME_ROW_LENGTH
+    # Draw player sequence with glow effect
+    player_seq_y_offset = 40 * SCALE_Y
     
     for row in range(NUM_GENOME_ROWS):
         row_start_idx = row * GENOME_ROW_LENGTH
         row_end_idx = row_start_idx + GENOME_ROW_LENGTH
         row_y = y_start + row * row_spacing
         
-        # Draw row label for each row that contains part of the player sequence
-        if row >= player_start_row and row <= player_end_row:
+        if row_start_idx <= alignment_start < row_end_idx:
+            # Draw row label
             label_x = x_start - 140 * SCALE_X
             draw_text("Read:", small_font, BLACK, window, label_x, row_y + player_seq_y_offset)
-        
-        # Calculate the portion of player sequence that belongs in this row
-        if row_start_idx <= alignment_start < row_end_idx:
+            
             # First row of player sequence
             bases_in_row = min(row_end_idx - alignment_start, len(player_seq))
             player_subseq = player_seq[:bases_in_row]
             offset = alignment_start - row_start_idx
+            
             for i, base in enumerate(player_subseq):
                 color = COLORS[base]
                 x_pos = x_start + (offset + i) * char_width
-                draw_text(base, font, color, window, x_pos, row_y + player_seq_y_offset)
+                
+                # Create and draw the glowing text
+                glow_surface = create_glow_surface(base, font, color, glow_alpha)
+                window.blit(glow_surface, (x_pos, row_y + player_seq_y_offset))
         
         elif alignment_start <= row_start_idx < alignment_start + len(player_seq):
+            # Draw row label
+            label_x = x_start - 140 * SCALE_X
+            draw_text("Read:", small_font, BLACK, window, label_x, row_y + player_seq_y_offset)
+            
             # Middle or last row of player sequence
             seq_offset = row_start_idx - alignment_start
             bases_in_row = min(GENOME_ROW_LENGTH, len(player_seq) - seq_offset)
             player_subseq = player_seq[seq_offset:seq_offset + bases_in_row]
+            
             for i, base in enumerate(player_subseq):
                 color = COLORS[base]
                 x_pos = x_start + i * char_width
-                draw_text(base, font, color, window, x_pos, row_y + player_seq_y_offset)
+                
+                # Create and draw the glowing text
+                glow_surface = create_glow_surface(base, font, color, glow_alpha)
+                window.blit(glow_surface, (x_pos, row_y + player_seq_y_offset))
+
 
 def draw_buttons(clicked_button, score):
     # Create footer section for buttons and instructions
@@ -501,10 +540,10 @@ async def main():
     while running:
         if status == "playing":
             current_time = pygame.time.get_ticks()
-            draw_sequences(player_seq, genome_seq, alignment_start, selected_position)
+            draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time)
             score = calculate_score(player_seq, genome_seq, alignment_start)
-            draw_buttons(clicked_button, score)  # Pass the score to draw_buttons
-            elapsed_time = (pygame.time.get_ticks() - start_time) / 1000
+            draw_buttons(clicked_button, score)
+            elapsed_time = (current_time - start_time) / 1000
             if elapsed_time - display_time >= 0.1:
                 display_time = elapsed_time
             draw_text(f"Time: {display_time:.2f} sec", font, BLACK, window, 50 * SCALE_X, 600 * SCALE_Y)            
