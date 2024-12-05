@@ -938,9 +938,8 @@ async def main():
                                 selected_position += GENOME_ROW_LENGTH
                         last_right_stick_vertical_movement_time = current_time
                 
-                # Handle D-pad with acceleration
                 dpad_x, dpad_y = joystick.get_hat(0)
-                
+
                 # Handle D-pad horizontal movement
                 current_dpad_x_direction = dpad_x
                 if current_dpad_x_direction != last_dpad_x_direction:
@@ -961,16 +960,12 @@ async def main():
                 # Apply D-pad horizontal movement with cooldown
                 if current_time - last_dpad_horizontal_movement_time >= dpad_horizontal_cooldown:
                     if dpad_x != 0:
+                        move_amount = 1
                         if dpad_x < 0:  # D-pad Left
-                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
-                                selected_position = alignment_start + len(player_seq) - 1
-                            elif selected_position > alignment_start:
-                                selected_position -= 1
+                            alignment_start = max(0, alignment_start - move_amount)
                         else:  # D-pad Right
-                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
-                                selected_position = alignment_start
-                            elif selected_position < alignment_start + len(player_seq) - 1:
-                                selected_position += 1
+                            alignment_start = min(len(genome_seq) - len(player_seq), 
+                                                alignment_start + move_amount)
                         last_dpad_horizontal_movement_time = current_time
 
                 # Handle D-pad vertical movement
@@ -993,16 +988,13 @@ async def main():
                 # Apply D-pad vertical movement with cooldown
                 if current_time - last_dpad_vertical_movement_time >= dpad_vertical_cooldown:
                     if dpad_y != 0:
+                        move_amount = 1
                         if dpad_y > 0:  # D-pad Up
-                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
-                                selected_position = alignment_start
-                            elif selected_position - GENOME_ROW_LENGTH >= alignment_start:
-                                selected_position -= GENOME_ROW_LENGTH
+                            new_pos = alignment_start - move_amount * GENOME_ROW_LENGTH
+                            alignment_start = max(0, new_pos)
                         else:  # D-pad Down
-                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
-                                selected_position = alignment_start + len(player_seq) - 1
-                            elif selected_position + GENOME_ROW_LENGTH < alignment_start + len(player_seq):
-                                selected_position += GENOME_ROW_LENGTH
+                            new_pos = alignment_start + move_amount * GENOME_ROW_LENGTH
+                            alignment_start = min(len(genome_seq) - len(player_seq), new_pos)
                         last_dpad_vertical_movement_time = current_time
 
                 # Handle A button (spacebar equivalent) with cooldown
