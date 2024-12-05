@@ -563,6 +563,15 @@ async def main():
     last_dpad_x_direction = 0
     last_dpad_y_direction = 0
 
+    # Right stick timing variables
+    last_right_stick_horizontal_movement_time = 0
+    last_right_stick_vertical_movement_time = 0
+    right_stick_horizontal_cooldown = base_horizontal_cooldown
+    right_stick_vertical_cooldown = base_vertical_cooldown
+    right_stick_horizontal_hold_start = 0
+    right_stick_vertical_hold_start = 0
+    last_right_stick_x_direction = 0
+    last_right_stick_y_direction = 0
 
     # First, add these variables at the start of your main() function with your other timing variables:
     button_a_last_press = 0
@@ -854,6 +863,81 @@ async def main():
                             alignment_start = max(0, new_pos)
                         last_vertical_movement_time = current_time
 
+                
+                # Right stick controls for cursor movement
+                right_x_axis = joystick.get_axis(2)  # Right stick horizontal
+                right_y_axis = joystick.get_axis(3)  # Right stick vertical
+                
+                # Handle right stick horizontal movement
+                current_right_stick_x_direction = 0
+                if abs(right_x_axis) > 0.4:  # Using same threshold as left stick
+                    current_right_stick_x_direction = 1 if right_x_axis > 0 else -1
+
+                if current_right_stick_x_direction != last_right_stick_x_direction:
+                    if current_right_stick_x_direction != 0:
+                        right_stick_horizontal_hold_start = current_time
+                        right_stick_horizontal_cooldown = base_horizontal_cooldown
+                    else:
+                        right_stick_horizontal_cooldown = base_horizontal_cooldown
+                last_right_stick_x_direction = current_right_stick_x_direction
+
+                if current_right_stick_x_direction != 0:
+                    hold_time = current_time - right_stick_horizontal_hold_start
+                    if hold_time > 0:
+                        progress = min(1.0, hold_time / acceleration_time)
+                        right_stick_horizontal_cooldown = max(min_horizontal_cooldown,
+                            base_horizontal_cooldown - (base_horizontal_cooldown - min_horizontal_cooldown) * progress)
+
+                # Apply right stick horizontal movement with cooldown
+                if current_time - last_right_stick_horizontal_movement_time >= right_stick_horizontal_cooldown:
+                    if abs(right_x_axis) > 0.4:
+                        if right_x_axis < 0:  # Right stick Left
+                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                selected_position = alignment_start + len(player_seq) - 1
+                            elif selected_position > alignment_start:
+                                selected_position -= 1
+                        else:  # Right stick Right
+                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                selected_position = alignment_start
+                            elif selected_position < alignment_start + len(player_seq) - 1:
+                                selected_position += 1
+                        last_right_stick_horizontal_movement_time = current_time
+
+                # Handle right stick vertical movement
+                current_right_stick_y_direction = 0
+                if abs(right_y_axis) > 0.9:  # Using same threshold as left stick
+                    current_right_stick_y_direction = 1 if right_y_axis > 0 else -1
+
+                if current_right_stick_y_direction != last_right_stick_y_direction:
+                    if current_right_stick_y_direction != 0:
+                        right_stick_vertical_hold_start = current_time
+                        right_stick_vertical_cooldown = base_vertical_cooldown
+                    else:
+                        right_stick_vertical_cooldown = base_vertical_cooldown
+                last_right_stick_y_direction = current_right_stick_y_direction
+
+                if current_right_stick_y_direction != 0:
+                    hold_time = current_time - right_stick_vertical_hold_start
+                    if hold_time > 0:
+                        progress = min(1.0, hold_time / acceleration_time)
+                        right_stick_vertical_cooldown = max(min_vertical_cooldown,
+                            base_vertical_cooldown - (base_vertical_cooldown - min_vertical_cooldown) * progress)
+
+                # Apply right stick vertical movement with cooldown
+                if current_time - last_right_stick_vertical_movement_time >= right_stick_vertical_cooldown:
+                    if abs(right_y_axis) > 0.9:
+                        if right_y_axis < 0:  # Right stick Up
+                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                selected_position = alignment_start
+                            elif selected_position - GENOME_ROW_LENGTH >= alignment_start:
+                                selected_position -= GENOME_ROW_LENGTH
+                        else:  # Right stick Down
+                            if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                selected_position = alignment_start + len(player_seq) - 1
+                            elif selected_position + GENOME_ROW_LENGTH < alignment_start + len(player_seq):
+                                selected_position += GENOME_ROW_LENGTH
+                        last_right_stick_vertical_movement_time = current_time
+                
                 # Handle D-pad with acceleration
                 dpad_x, dpad_y = joystick.get_hat(0)
                 
