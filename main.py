@@ -68,6 +68,8 @@ COLORS = {
     '-': (128, 128, 128)  # Gray for gaps
 }
 
+
+
 # Scoring values
 MATCH = 1
 MISMATCH = -1
@@ -86,6 +88,24 @@ BUTTON_X = 2
 
 # Video file path
 video_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\zymologo.mov"
+
+def get_score_color(score):
+    """
+    Returns a color tuple (R,G,B) that smoothly transitions from red to yellow to green,
+    with -20 appearing yellowish and transitioning to full green by 10
+    """
+    if score <= -40:
+        return (255, 0, 0)  # Pure red for very low scores
+    elif score <= -20:
+        # Transition from red to yellow (-40 to -20)
+        ratio = (score + 40) / 20
+        return (255, int(255 * ratio), 0)
+    elif score <= 10:
+        # Transition from yellow to green (-20 to 10)
+        ratio = (score + 20) / 30
+        return (int(255 * (1 - ratio)), 255, 0)
+    else:
+        return (0, 255, 0)  # Pure green for scores above 10
 
 # Update video handling in play_video function
 def play_video(video_path):
@@ -329,72 +349,59 @@ def draw_buttons(clicked_button, score):
     # Clear the footer area
     window.fill(WHITE, (0, footer_y, WIDTH, footer_height))
     
-    # Calculate widths for layout
-    button_width = 160 * SCALE_X
-    button_height = 50 * SCALE_Y
+    # Calculate improved widths for layout - make buttons wider to better fit text
+    button_width = 180 * SCALE_X  # Increased from 160
+    button_height = 60 * SCALE_Y  # Increased from 50 for better proportions
     instructions_width = 800 * SCALE_X
     score_width = 200 * SCALE_X
+    button_spacing = 30 * SCALE_X  # Consistent spacing between buttons
     
     # Layout: [Score] [Submit] [Play Again] [Exit] [Instructions Panel]
-    total_width = score_width + button_width * 3 + instructions_width + 160 * SCALE_X  # Add spacing
+    total_width = score_width + (button_width * 3) + (button_spacing * 3) + instructions_width
     start_x = (WIDTH - total_width) / 2
     
-    # Draw score panel
+    # Helper function to center text in button
+    def center_text_in_button(text, button_rect, color):
+        text_surface = font.render(text, True, color)
+        text_rect = text_surface.get_rect()
+        text_rect.center = button_rect.center
+        window.blit(text_surface, text_rect)
+    
+    # Draw score panel with improved centering
     score_rect = pygame.Rect(start_x, footer_y + (footer_height - button_height) / 2, 
                            score_width, button_height)
-    pygame.draw.rect(window, LIGHT_BLUE, score_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
+    pygame.draw.rect(window, get_score_color(score), score_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
     score_text = f"Score: {score}"
-    score_text_width = font.size(score_text)[0]
-    draw_text(score_text, font, BLACK, window,
-              score_rect.x + (score_width - score_text_width) / 2,
-              score_rect.y + (button_height - font_size) / 2)
+    center_text_in_button(score_text, score_rect, BLACK)
     
-    # Update button rectangles with new positions
-    submit_button_rect.update(start_x + score_width + 20 * SCALE_X,
-                            footer_y + (footer_height - button_height) / 2, 
-                            button_width, button_height)
-    play_again_button_rect.update(submit_button_rect.right + 20 * SCALE_X, 
-                                footer_y + (footer_height - button_height) / 2,
-                                button_width, button_height)
-    exit_button_rect.update(play_again_button_rect.right + 20 * SCALE_X,
-                          footer_y + (footer_height - button_height) / 2,
-                          button_width, button_height)
+    # Update button rectangles with new positions and consistent spacing
+    x_pos = start_x + score_width + button_spacing
+    button_y = footer_y + (footer_height - button_height) / 2
     
-    # Draw submit button
-    if clicked_button == "submit":
-        pygame.draw.rect(window, (0, 200, 0), submit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
-    else:
-        pygame.draw.rect(window, GREEN, submit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
-
-    # Draw play again button
-    if clicked_button == "play_again":
-        pygame.draw.rect(window, (0, 0, 200), play_again_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
-    else:
-        pygame.draw.rect(window, BLUE, play_again_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
-        
-    # Draw exit button
-    if clicked_button == "exit":
-        pygame.draw.rect(window, (200, 0, 0), exit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
-    else:
-        pygame.draw.rect(window, RED, exit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
+    # Submit button
+    submit_button_rect.update(x_pos, button_y, button_width, button_height)
+    x_pos += button_width + button_spacing
     
-    # Center text within buttons
-    submit_text = "Submit"
-    play_again_text = "Play Again"
-    exit_text = "Exit Game"
-    submit_width = font.size(submit_text)[0]
-    play_again_width = font.size(play_again_text)[0]
-    exit_width = font.size(exit_text)[0]
+    # Play Again button
+    play_again_button_rect.update(x_pos, button_y, button_width, button_height)
+    x_pos += button_width + button_spacing
     
-    draw_text(submit_text, font, BLACK, window, 
-              submit_button_rect.x + (button_width - submit_width) / 2,
-              submit_button_rect.y + (button_height - font_size) / 2)
-    draw_text(play_again_text, font, WHITE, window,
-              play_again_button_rect.x + (button_width - play_again_width) / 2,
-              play_again_button_rect.y + (button_height - font_size) / 2)
-    draw_text(exit_text, font, WHITE, window,
-              exit_button_rect.x + (button_width - exit_width) / 2,
-              exit_button_rect.y + (button_height - font_size) / 2)
+    # Exit button
+    exit_button_rect.update(x_pos, button_y, button_width, button_height)
+    
+    # Draw buttons with improved colors and consistent styling
+    def draw_button(rect, text, base_color, highlight_color, is_clicked, text_color):
+        color = highlight_color if is_clicked else base_color
+        pygame.draw.rect(window, color, rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
+        center_text_in_button(text, rect, text_color)
+    
+    # Draw all buttons using the helper function
+    draw_button(submit_button_rect, "Submit", GREEN, (0, 180, 0), 
+                clicked_button == "submit", BLACK)
+    draw_button(play_again_button_rect, "Play Again", BLUE, (0, 0, 180), 
+                clicked_button == "play_again", WHITE)
+    draw_button(exit_button_rect, "Exit Game", RED, (180, 0, 0), 
+                clicked_button == "exit", WHITE)
     
     # Draw instructions panel
     instructions_x = exit_button_rect.right + 40 * SCALE_X
@@ -410,13 +417,11 @@ def draw_buttons(clicked_button, score):
     # Draw instructions in two columns
     instructions = [
         [("Movement Controls:", BLACK),
-        ("• A/D: Move read left/right", BLUE),
-        ("• W/S: Move read up/down", BLUE)],
+        ("• Left Stick: Move read", BLUE),
+        ("• Right Stick: Move insertion box", BLUE)],
         [("Editing Controls:", BLACK),
-        ("• Space: Add gap at cursor", RED),
-        ("• Backspace: Delete gap", RED),
-        ("• Arrow Keys: Move cursor", GREEN),
-        ("• Y: Show/Hide hint", YELLOW)]
+        ("• A: Add gap at cursor", RED),
+        ("• B: Delete gap", RED),]
     ]
     
     # Calculate column widths and positions
