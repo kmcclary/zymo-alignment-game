@@ -51,6 +51,7 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 LIGHT_BLUE = (173, 216, 230)
 GREEN = (0, 255, 0)
+YELLOW = (255, 255, 0)
 
 # Colors for nucleotides
 COLORS = {
@@ -197,7 +198,7 @@ def create_glow_surface(text, font, color, alpha):
     
     return glow_surface
 
-def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time):
+def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time, showing_hint=False, optimal_position=None):
     # Clear the main game area
     window.fill(WHITE)
     
@@ -233,6 +234,17 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
         for i, base in enumerate(genome_subseq):
             x_pos = x_start + i * char_width
             color = COLORS[base]
+            
+            if showing_hint and optimal_position is not None:
+                absolute_pos = start_idx + i + 4
+                # Add length of player sequence without gaps to get correct end position
+                player_len = len([c for c in player_seq if c != '-']) + 4
+                if optimal_position <= absolute_pos < optimal_position + player_len:
+                    # Draw a yellow highlight rectangle behind the base
+                    highlight_rect = pygame.Rect(x_pos - 2, row_y - 2,
+                                            char_width + 4, char_height + 4)
+                    pygame.draw.rect(window, YELLOW, highlight_rect)
+            
             draw_text(base, font, color, window, x_pos, row_y)
             
             if (selected_position is not None and 
@@ -361,12 +373,13 @@ def draw_buttons(clicked_button, score):
     # Draw instructions in two columns
     instructions = [
         [("Movement Controls:", BLACK),
-         ("• A/D: Move read left/right", BLUE),
-         ("• W/S: Move read up/down", BLUE)],
+        ("• A/D: Move read left/right", BLUE),
+        ("• W/S: Move read up/down", BLUE)],
         [("Editing Controls:", BLACK),
-         ("• Space: Add gap at cursor", RED),
-         ("• Backspace: Delete gap", RED),
-         ("• Arrow Keys: Move cursor", GREEN)]
+        ("• Space: Add gap at cursor", RED),
+        ("• Backspace: Delete gap", RED),
+        ("• Arrow Keys: Move cursor", GREEN),
+        ("• Y: Show/Hide hint", YELLOW)]
     ]
     
     # Calculate column widths and positions
@@ -448,8 +461,29 @@ def calculate_score(player_seq, genome_seq, alignment_start):
                 
     return score
 
+def find_optimal_position(player_seq, genome_seq):
+    """Find the position in the genome sequence that gives the highest alignment score."""
+    max_score = float('-inf')
+    best_position = 0
+    
+    # We know the sequence needs 4 gaps, so the aligned region will be 54 bases long 
+    # (50 bases from player sequence + 4 gaps)
+    optimal_window_size = len(player_seq) + 4
+    
+    # Try every possible position
+    for pos in range(len(genome_seq) - optimal_window_size + 1):
+        score = calculate_score(player_seq, genome_seq, pos)
+        if score > max_score:
+            max_score = score
+            best_position = pos
+    
+    return best_position, max_score
+
 async def main():
     global WIDTH, HEIGHT, SCALE_X, SCALE_Y, font, small_font, submit_button_rect, play_again_button_rect, window
+
+    showing_hint = False
+    optimal_position = None
 
     # Add input cooldown variables
     last_input_time = pygame.time.get_ticks()
@@ -600,7 +634,7 @@ async def main():
     while running:
         if status == "playing":
             current_time = pygame.time.get_ticks()
-            draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time)
+            draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time, showing_hint, optimal_position)
             score = calculate_score(player_seq, genome_seq, alignment_start)
             draw_buttons(clicked_button, score)
             elapsed_time = (current_time - start_time) / 1000
@@ -886,7 +920,14 @@ async def main():
                 elif event.type == pygame.MOUSEBUTTONUP:
                     clicked_button = None
                 elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE and selected_position is not None:
+                    if event.key == pygame.K_y:
+                        if not showing_hint:
+                            optimal_position, max_score = find_optimal_position(player_seq, genome_seq)
+                            showing_hint = True
+                        else:
+                            showing_hint = False
+                            optimal_position = None
+                    elif event.key == pygame.K_SPACE and selected_position is not None:
                         if selected_position >= alignment_start and selected_position < alignment_start + len(player_seq) - 1:
                             player_seq = player_seq[:selected_position-alignment_start] + '-' + player_seq[selected_position-alignment_start:]
 
