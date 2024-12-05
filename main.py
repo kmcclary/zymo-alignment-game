@@ -16,14 +16,24 @@ random.seed()
 
 
 # Add these after your pygame initialization code
-background_path = "C:\\Users\kmccl\\Documents\\GitHub\\seq_align_game-main\\gamebackground2.png"
+background_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\gamebackground2.png"
+logo_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\zymologo2.png"
+
+# Load both images
 try:
     background_image = pygame.image.load(background_path)
 except pygame.error as e:
     print(f"Could not load background image: {e}")
     background_image = None
 
+try:
+    logo_image = pygame.image.load(logo_path)
+except pygame.error as e:
+    print(f"Could not load logo image: {e}")
+    logo_image = None
 
+# Add banner height constant after the other display constants
+BANNER_HEIGHT = 80  # Height of the banner in pixels
 # Get the display info to set up dynamic window sizing
 display_info = pygame.display.Info()
 SCREEN_WIDTH = display_info.current_w
@@ -36,11 +46,16 @@ current_ratio = SCREEN_WIDTH/SCREEN_HEIGHT
 if current_ratio > target_ratio:
     # Width is the limiting factor
     HEIGHT = int(SCREEN_HEIGHT * 0.9)  # Use 90% of screen height
+    HEIGHT_WITH_BANNER = HEIGHT + BANNER_HEIGHT  # Add banner height
     WIDTH = int(HEIGHT * target_ratio)
 else:
     # Height is the limiting factor
     WIDTH = int(SCREEN_WIDTH * 0.9)  # Use 90% of screen width
     HEIGHT = int(WIDTH / target_ratio)
+    HEIGHT_WITH_BANNER = HEIGHT + BANNER_HEIGHT  # Add banner height
+
+# Create padding to maintain same empty space
+VERTICAL_PADDING = int(HEIGHT * 0.05)
 
 # Create the window - modified to use hardware acceleration
 window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
@@ -100,6 +115,40 @@ BUTTON_X = 2
 # Video file path
 video_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\zymologo.mov"
 
+def draw_banner():
+    # Draw black banner
+    banner_rect = pygame.Rect(0, 0, WIDTH, BANNER_HEIGHT)
+    pygame.draw.rect(window, BLACK, banner_rect)
+    
+    if logo_image is not None:
+        # Calculate logo dimensions (maintain aspect ratio)
+        logo_height = BANNER_HEIGHT - 4  # Leave 2px padding top and bottom
+        aspect_ratio = logo_image.get_width() / logo_image.get_height()
+        logo_width = int(logo_height * aspect_ratio)
+        
+        # Scale logo with smoothscale for better quality
+        try:
+            # Convert image to RGB mode if it's not already
+            if logo_image.get_bitsize() != 32:
+                temp_surface = pygame.Surface((logo_image.get_width(), logo_image.get_height()), pygame.SRCALPHA)
+                temp_surface.blit(logo_image, (0, 0))
+                logo_image_rgb = temp_surface
+            else:
+                logo_image_rgb = logo_image
+                
+            # Use smoothscale for better quality scaling
+            scaled_logo = pygame.transform.smoothscale(logo_image_rgb, (logo_width, logo_height))
+        except:
+            # Fallback to regular scale if smoothscale fails
+            scaled_logo = pygame.transform.scale(logo_image, (logo_width, logo_height))
+        
+        # Position logo on far right with 5px padding
+        logo_x = WIDTH - logo_width - 5
+        logo_y = 2  # 2px padding from top
+        
+        # Draw logo
+        window.blit(scaled_logo, (logo_x, logo_y))
+
 # Add this function after your other function definitions
 def draw_background():
     if background_image is not None:
@@ -150,6 +199,7 @@ def play_video(video_path):
 def draw_start_screen():
     draw_background()
     window.fill(WHITE)
+    draw_banner()
     draw_text("Press any key to start the game", font, BLACK, window, WIDTH // 2 - 150 * SCALE_X, HEIGHT // 2)
     pygame.display.update()
 
@@ -263,7 +313,7 @@ def create_glow_surface(text, font, color, alpha):
 def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time, showing_hint=False, optimal_position=None):
     # Draw background instead of filling with white
     draw_background()
-    
+    draw_banner()
     base_font_size = int(50 * min(SCALE_X, SCALE_Y))  # Make this larger for bigger letters
     base_font = pygame.font.SysFont('Arial', base_font_size)
 
@@ -276,10 +326,10 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
     
     # Center the sequences horizontally
     x_start = (WIDTH - sequence_width) / 2
-    y_start = 50 * SCALE_Y
+    y_start = BANNER_HEIGHT + (50 * SCALE_Y)
     
-    # Adjust row spacing for better vertical distribution
-    row_spacing = (HEIGHT - 200 * SCALE_Y) / (6)
+    game_area_height = HEIGHT - (2 * VERTICAL_PADDING)
+    row_spacing = game_area_height / (NUM_GENOME_ROWS + 1)
 
     # Calculate glow alpha using sine wave for animation
     glow_alpha = int(128 + 64 * math.sin(current_time * 0.004))  # Adjust speed with multiplier
