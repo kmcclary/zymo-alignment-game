@@ -928,14 +928,31 @@ async def main():
                     if abs(right_y_axis) > 0.9:
                         if right_y_axis < 0:  # Right stick Up
                             if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                # If we're outside the read sequence, go directly to the first position
                                 selected_position = alignment_start
-                            elif selected_position - GENOME_ROW_LENGTH >= alignment_start:
-                                selected_position -= GENOME_ROW_LENGTH
+                            else:
+                                # Move up one row while maintaining column position
+                                current_col = selected_position % GENOME_ROW_LENGTH
+                                target_position = selected_position - GENOME_ROW_LENGTH
+                                if target_position >= alignment_start:
+                                    selected_position = target_position
+                                else:
+                                    # If we're at the top row and moving up, go to first position
+                                    selected_position = alignment_start
                         else:  # Right stick Down
                             if selected_position is None or selected_position < alignment_start or selected_position >= alignment_start + len(player_seq):
+                                # If we're outside the read sequence, go directly to the last position
                                 selected_position = alignment_start + len(player_seq) - 1
-                            elif selected_position + GENOME_ROW_LENGTH < alignment_start + len(player_seq):
-                                selected_position += GENOME_ROW_LENGTH
+                            else:
+                                # Move down one row while maintaining column position
+                                current_col = selected_position % GENOME_ROW_LENGTH
+                                target_position = selected_position + GENOME_ROW_LENGTH
+                                if target_position < alignment_start + len(player_seq):
+                                    selected_position = target_position
+                                else:
+                                    # If we're at the bottom row and moving down, go to last position
+                                    selected_position = alignment_start + len(player_seq) - 1
+                        
                         last_right_stick_vertical_movement_time = current_time
                 
                 dpad_x, dpad_y = joystick.get_hat(0)
