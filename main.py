@@ -18,29 +18,35 @@ display_info = pygame.display.Info()
 SCREEN_WIDTH = display_info.current_w
 SCREEN_HEIGHT = display_info.current_h
 
-# Calculate the maximum size while maintaining 16:9 aspect ratio
-if SCREEN_WIDTH / 16 > SCREEN_HEIGHT / 9:
-    WIDTH = SCREEN_HEIGHT * 16 // 9
-    HEIGHT = SCREEN_HEIGHT
-else:
-    WIDTH = SCREEN_WIDTH
-    HEIGHT = SCREEN_WIDTH * 9 // 16
+# Calculate the maximum size while maintaining aspect ratio
+target_ratio = 16/9
+current_ratio = SCREEN_WIDTH/SCREEN_HEIGHT
 
-# Create the window
-window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+if current_ratio > target_ratio:
+    # Width is the limiting factor
+    HEIGHT = int(SCREEN_HEIGHT * 0.9)  # Use 90% of screen height
+    WIDTH = int(HEIGHT * target_ratio)
+else:
+    # Height is the limiting factor
+    WIDTH = int(SCREEN_WIDTH * 0.9)  # Use 90% of screen width
+    HEIGHT = int(WIDTH / target_ratio)
+
+# Create the window - modified to use hardware acceleration
+window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
 pygame.display.set_caption("DNA Sequence Alignment")
 
-# Scale factor for dynamic resizing
+# Adjust scale factors
 SCALE_X = WIDTH / 1920
 SCALE_Y = HEIGHT / 1080
 
 # Buttons - scale with window size
 submit_button_rect = pygame.Rect(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
 play_again_button_rect = pygame.Rect(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
+exit_button_rect = pygame.Rect(550 * SCALE_X, HEIGHT - 100 * SCALE_Y, 160 * SCALE_X, 50 * SCALE_Y)
 
-# Fonts - scale with window size
-font_size = int(48 * min(SCALE_X, SCALE_Y))
-small_font_size = int(32 * min(SCALE_X, SCALE_Y))
+# Update font sizes with better scaling
+font_size = int(36 * min(SCALE_X, SCALE_Y))  # Reduced from 48
+small_font_size = int(24 * min(SCALE_X, SCALE_Y))  # Reduced from 32
 font = pygame.font.SysFont('Arial', font_size)
 small_font = pygame.font.SysFont('Arial', small_font_size)
 
@@ -69,8 +75,8 @@ GAP_OPENING = -2
 GAP_EXTENSION = -1
 
 # Display dimensions for genome sequence
-GENOME_ROW_LENGTH = 38
-NUM_GENOME_ROWS = 8
+GENOME_ROW_LENGTH = 42
+NUM_GENOME_ROWS = 6
 ROW_SPACING = int(200 * SCALE_Y)
 
 BUTTON_A = 0  # Typically the A button is index 0
@@ -81,9 +87,23 @@ BUTTON_X = 2
 # Video file path
 video_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\zymologo.mov"
 
+# Update video handling in play_video function
 def play_video(video_path):
     clip = VideoFileClip(video_path)
-    clip = clip.set_size((WIDTH, HEIGHT))
+    # Calculate video dimensions maintaining aspect ratio
+    video_ratio = clip.w / clip.h
+    if video_ratio > target_ratio:
+        video_width = WIDTH
+        video_height = int(WIDTH / video_ratio)
+    else:
+        video_height = HEIGHT
+        video_width = int(HEIGHT * video_ratio)
+    
+    # Center the video
+    x_offset = (WIDTH - video_width) // 2
+    y_offset = (HEIGHT - video_height) // 2
+    
+    clip = clip.resize((video_width, video_height))
     clip.preview()
 
 def draw_start_screen():
@@ -203,7 +223,7 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
     window.fill(WHITE)
     
     # Calculate optimal spacing and positioning
-    char_width = 40 * SCALE_X
+    char_width = 35 * SCALE_X
     char_height = 60 * SCALE_Y
     
     # Calculate total width needed for sequence display
@@ -214,7 +234,7 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
     y_start = 50 * SCALE_Y
     
     # Adjust row spacing for better vertical distribution
-    row_spacing = (HEIGHT - 300 * SCALE_Y) / (6)
+    row_spacing = (HEIGHT - 200 * SCALE_Y) / (6)
 
     # Calculate glow alpha using sine wave for animation
     glow_alpha = int(128 + 64 * math.sin(current_time * 0.004))  # Adjust speed with multiplier
@@ -227,8 +247,8 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
         
         # Draw row label
         label_x = x_start - 140 * SCALE_X
-        row_y = y_start + row * row_spacing
-        draw_text(f"Genome:", small_font, BLACK, window, label_x, row_y)
+        row_y = y_start + row * row_spacing + 10
+        draw_text(f"Genome:", small_font, BLACK, window, label_x, row_y + 6)
         
         # Draw sequence
         for i, base in enumerate(genome_subseq):
@@ -265,7 +285,8 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
         if row_start_idx <= alignment_start < row_end_idx:
             # Draw row label
             label_x = x_start - 140 * SCALE_X
-            draw_text("Read:", small_font, BLACK, window, label_x, row_y + player_seq_y_offset)
+            glow_label = create_glow_surface("Read:", small_font, BLACK, glow_alpha)
+            window.blit(glow_label, (label_x, row_y + player_seq_y_offset +16))
             
             # First row of player sequence
             bases_in_row = min(row_end_idx - alignment_start, len(player_seq))
@@ -278,12 +299,13 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
                 
                 # Create and draw the glowing text
                 glow_surface = create_glow_surface(base, font, color, glow_alpha)
-                window.blit(glow_surface, (x_pos, row_y + player_seq_y_offset))
+                window.blit(glow_surface, (x_pos, row_y + player_seq_y_offset + 10))
         
         elif alignment_start <= row_start_idx < alignment_start + len(player_seq):
             # Draw row label
             label_x = x_start - 140 * SCALE_X
-            draw_text("Read:", small_font, BLACK, window, label_x, row_y + player_seq_y_offset)
+            glow_label = create_glow_surface("Read:", small_font, BLACK, glow_alpha)
+            window.blit(glow_label, (label_x, row_y + player_seq_y_offset +16))
             
             # Middle or last row of player sequence
             seq_offset = row_start_idx - alignment_start
@@ -296,12 +318,12 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
                 
                 # Create and draw the glowing text
                 glow_surface = create_glow_surface(base, font, color, glow_alpha)
-                window.blit(glow_surface, (x_pos, row_y + player_seq_y_offset))
+                window.blit(glow_surface, (x_pos, row_y + player_seq_y_offset + 10))
 
 
 def draw_buttons(clicked_button, score):
     # Create footer section for buttons and instructions
-    footer_height = 120 * SCALE_Y  # Reduced height
+    footer_height = 180 * SCALE_Y
     footer_y = HEIGHT - footer_height
     
     # Clear the footer area
@@ -310,11 +332,11 @@ def draw_buttons(clicked_button, score):
     # Calculate widths for layout
     button_width = 160 * SCALE_X
     button_height = 50 * SCALE_Y
-    instructions_width = 600 * SCALE_X
+    instructions_width = 800 * SCALE_X
     score_width = 200 * SCALE_X
     
-    # Layout: [Score] [Submit] [Play Again] [Instructions Panel]
-    total_width = score_width + button_width * 2 + instructions_width + 120 * SCALE_X  # Add spacing
+    # Layout: [Score] [Submit] [Play Again] [Exit] [Instructions Panel]
+    total_width = score_width + button_width * 3 + instructions_width + 160 * SCALE_X  # Add spacing
     start_x = (WIDTH - total_width) / 2
     
     # Draw score panel
@@ -334,23 +356,35 @@ def draw_buttons(clicked_button, score):
     play_again_button_rect.update(submit_button_rect.right + 20 * SCALE_X, 
                                 footer_y + (footer_height - button_height) / 2,
                                 button_width, button_height)
+    exit_button_rect.update(play_again_button_rect.right + 20 * SCALE_X,
+                          footer_y + (footer_height - button_height) / 2,
+                          button_width, button_height)
     
-    # Draw buttons
+    # Draw submit button
     if clicked_button == "submit":
         pygame.draw.rect(window, (0, 200, 0), submit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
     else:
         pygame.draw.rect(window, GREEN, submit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
 
+    # Draw play again button
     if clicked_button == "play_again":
         pygame.draw.rect(window, (0, 0, 200), play_again_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
     else:
         pygame.draw.rect(window, BLUE, play_again_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
+        
+    # Draw exit button
+    if clicked_button == "exit":
+        pygame.draw.rect(window, (200, 0, 0), exit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
+    else:
+        pygame.draw.rect(window, RED, exit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
     
     # Center text within buttons
     submit_text = "Submit"
     play_again_text = "Play Again"
+    exit_text = "Exit Game"
     submit_width = font.size(submit_text)[0]
     play_again_width = font.size(play_again_text)[0]
+    exit_width = font.size(exit_text)[0]
     
     draw_text(submit_text, font, BLACK, window, 
               submit_button_rect.x + (button_width - submit_width) / 2,
@@ -358,10 +392,13 @@ def draw_buttons(clicked_button, score):
     draw_text(play_again_text, font, WHITE, window,
               play_again_button_rect.x + (button_width - play_again_width) / 2,
               play_again_button_rect.y + (button_height - font_size) / 2)
+    draw_text(exit_text, font, WHITE, window,
+              exit_button_rect.x + (button_width - exit_width) / 2,
+              exit_button_rect.y + (button_height - font_size) / 2)
     
     # Draw instructions panel
-    instructions_x = play_again_button_rect.right + 40 * SCALE_X
-    instructions_height = footer_height - 20 * SCALE_Y
+    instructions_x = exit_button_rect.right + 40 * SCALE_X
+    instructions_height = footer_height * SCALE_Y
     instructions_y = footer_y + 10 * SCALE_Y
     
     # Draw panel background
@@ -436,12 +473,16 @@ def draw_leaderboard(leaderboard, score, time, name, status, clicked_button):
 
 def calculate_score(player_seq, genome_seq, alignment_start):
     """
-    Calculate alignment score:
+    Calculate alignment score with bounds checking:
     Match: +1
     Mismatch: -1
     Gap opening: -2
     Gap extension: -1
     """
+    # First check if alignment_start + player sequence length would exceed genome length
+    if alignment_start + len(player_seq) > len(genome_seq):
+        return float('-inf')  # Return very low score if alignment would go out of bounds
+    
     score = 0
     gap_open = False
     
@@ -454,10 +495,13 @@ def calculate_score(player_seq, genome_seq, alignment_start):
                 score += GAP_EXTENSION  # -1
         else:
             gap_open = False
-            if player_seq[i] == genome_seq[alignment_start + i]:
-                score += MATCH  # +1
-            else:
-                score += MISMATCH  # -1
+            try:
+                if player_seq[i] == genome_seq[alignment_start + i]:
+                    score += MATCH  # +1
+                else:
+                    score += MISMATCH  # -1
+            except IndexError:
+                return float('-inf')  # Return very low score if we somehow hit an index error
                 
     return score
 
@@ -570,17 +614,32 @@ async def main():
                 break
             elif event.type == pygame.VIDEORESIZE:
                 WIDTH, HEIGHT = event.size
-                window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+                current_ratio = WIDTH/HEIGHT
+    
+                if current_ratio > target_ratio:
+                    HEIGHT = event.size[1]
+                    WIDTH = int(HEIGHT * target_ratio)
+                else:
+                    WIDTH = event.size[0]
+                    HEIGHT = int(WIDTH / target_ratio)
+    
+                window = pygame.display.set_mode((WIDTH, HEIGHT), 
+                                                pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+    
                 SCALE_X = WIDTH / 1920
                 SCALE_Y = HEIGHT / 1080
-                font_size = int(24 * min(SCALE_X, SCALE_Y))
-                small_font_size = int(16 * min(SCALE_X, SCALE_Y))
+    
+                # Update font sizes with better scaling
+                font_size = int(36 * min(SCALE_X, SCALE_Y))
+                small_font_size = int(24 * min(SCALE_X, SCALE_Y))
                 font = pygame.font.SysFont('Arial', font_size)
                 small_font = pygame.font.SysFont('Arial', small_font_size)
+    
+                # Update button positions
                 submit_button_rect.update(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
                 play_again_button_rect.update(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
-                video_surface = pygame.Surface((WIDTH, HEIGHT))
-        
+                exit_button_rect.update(550 * SCALE_X, HEIGHT - 100 * SCALE_Y, 160 * SCALE_X, 50 * SCALE_Y)
+                    
         await asyncio.sleep(0)
 
     draw_start_screen()
@@ -605,15 +664,31 @@ async def main():
                 waiting_for_start = False
             elif event.type == pygame.VIDEORESIZE:
                 WIDTH, HEIGHT = event.size
-                window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+                current_ratio = WIDTH/HEIGHT
+    
+                if current_ratio > target_ratio:
+                    HEIGHT = event.size[1]
+                    WIDTH = int(HEIGHT * target_ratio)
+                else:
+                    WIDTH = event.size[0]
+                    HEIGHT = int(WIDTH / target_ratio)
+    
+                window = pygame.display.set_mode((WIDTH, HEIGHT), 
+                                                pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+    
                 SCALE_X = WIDTH / 1920
                 SCALE_Y = HEIGHT / 1080
-                font_size = int(24 * min(SCALE_X, SCALE_Y))
-                small_font_size = int(16 * min(SCALE_X, SCALE_Y))
+    
+                # Update font sizes with better scaling
+                font_size = int(36 * min(SCALE_X, SCALE_Y))
+                small_font_size = int(24 * min(SCALE_X, SCALE_Y))
                 font = pygame.font.SysFont('Arial', font_size)
                 small_font = pygame.font.SysFont('Arial', small_font_size)
+    
+                # Update button positions
                 submit_button_rect.update(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
                 play_again_button_rect.update(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
+                exit_button_rect.update(550 * SCALE_X, HEIGHT - 100 * SCALE_Y, 160 * SCALE_X, 50 * SCALE_Y)
 
     pygame.key.set_repeat(150, 20)
     running = True
@@ -874,6 +949,8 @@ async def main():
                     else:
                         status = "lost"
 
+                
+
                 if joystick.get_button(BUTTON_X):
                     current_time = pygame.time.get_ticks()
                     if current_time - button_x_last_press >= button_cooldown:
@@ -887,6 +964,8 @@ async def main():
                         final_score = 0
                         final_time = 10000
                         player_name = ""
+                        showing_hint = False
+                        optimal_position = None
                         status = "playing"
                         input_active = False
                         button_x_last_press = current_time
@@ -917,6 +996,13 @@ async def main():
                         final_score = 0
                         final_time = 10000
                         player_name = ""
+                        showing_hint = False
+                        optimal_position = None
+                        status = "playing"
+                        input_active = False
+                    elif exit_button_rect.collidepoint(mouse_pos):
+                        clicked_button = "exit"
+                        running = False  # This will exit the game
                 elif event.type == pygame.MOUSEBUTTONUP:
                     clicked_button = None
                 elif event.type == pygame.KEYDOWN:
@@ -969,15 +1055,31 @@ async def main():
 
                 elif event.type == pygame.VIDEORESIZE:
                     WIDTH, HEIGHT = event.size
-                    window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+                    current_ratio = WIDTH/HEIGHT
+    
+                    if current_ratio > target_ratio:
+                        HEIGHT = event.size[1]
+                        WIDTH = int(HEIGHT * target_ratio)
+                    else:
+                        WIDTH = event.size[0]
+                        HEIGHT = int(WIDTH / target_ratio)
+    
+                    window = pygame.display.set_mode((WIDTH, HEIGHT), 
+                                                    pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+    
                     SCALE_X = WIDTH / 1920
                     SCALE_Y = HEIGHT / 1080
-                    font_size = int(24 * min(SCALE_X, SCALE_Y))
-                    small_font_size = int(16 * min(SCALE_X, SCALE_Y))
+    
+                    # Update font sizes with better scaling
+                    font_size = int(36 * min(SCALE_X, SCALE_Y))
+                    small_font_size = int(24 * min(SCALE_X, SCALE_Y))
                     font = pygame.font.SysFont('Arial', font_size)
                     small_font = pygame.font.SysFont('Arial', small_font_size)
+    
+                    # Update button positions
                     submit_button_rect.update(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
                     play_again_button_rect.update(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
+                    exit_button_rect.update(550 * SCALE_X, HEIGHT - 100 * SCALE_Y, 160 * SCALE_X, 50 * SCALE_Y)
         else:
             draw_leaderboard(leaderboard, final_score, final_time, player_name, status, clicked_button)
             for event in pygame.event.get():
@@ -996,6 +1098,8 @@ async def main():
                             final_score = 0
                             final_time = 10000
                             player_name = ""
+                            showing_hint = False
+                            optimal_position = None
                             status = "playing"
                             input_active = False
                             button_x_last_press = current_time
@@ -1014,6 +1118,8 @@ async def main():
                         final_score = 0
                         final_time = 10000
                         player_name = ""
+                        showing_hint = False
+                        optimal_position = None
                         status = "playing"
                         input_active = False
                 elif event.type == pygame.MOUSEBUTTONUP:
@@ -1032,15 +1138,31 @@ async def main():
                             player_name += event.unicode
                 elif event.type == pygame.VIDEORESIZE:
                     WIDTH, HEIGHT = event.size
-                    window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+                    current_ratio = WIDTH/HEIGHT
+    
+                    if current_ratio > target_ratio:
+                        HEIGHT = event.size[1]
+                        WIDTH = int(HEIGHT * target_ratio)
+                    else:
+                        WIDTH = event.size[0]
+                        HEIGHT = int(WIDTH / target_ratio)
+    
+                    window = pygame.display.set_mode((WIDTH, HEIGHT), 
+                                                    pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+    
                     SCALE_X = WIDTH / 1920
                     SCALE_Y = HEIGHT / 1080
-                    font_size = int(24 * min(SCALE_X, SCALE_Y))
-                    small_font_size = int(16 * min(SCALE_X, SCALE_Y))
+    
+                    # Update font sizes with better scaling
+                    font_size = int(36 * min(SCALE_X, SCALE_Y))
+                    small_font_size = int(24 * min(SCALE_X, SCALE_Y))
                     font = pygame.font.SysFont('Arial', font_size)
                     small_font = pygame.font.SysFont('Arial', small_font_size)
+    
+                    # Update button positions
                     submit_button_rect.update(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
                     play_again_button_rect.update(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
+                    exit_button_rect.update(550 * SCALE_X, HEIGHT - 100 * SCALE_Y, 160 * SCALE_X, 50 * SCALE_Y)
 
         await asyncio.sleep(0)
 
