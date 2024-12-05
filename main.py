@@ -5,6 +5,7 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 import pygame.joystick
 import math
 
+
 # Initialize pygame
 pygame.init()
 pygame.joystick.init()
@@ -12,6 +13,16 @@ joysticks = [pygame.joystick.Joystick(i) for i in range(pygame.joystick.get_coun
 for joystick in joysticks:
     joystick.init()
 random.seed()
+
+
+# Add these after your pygame initialization code
+background_path = "C:\\Users\kmccl\\Documents\\GitHub\\seq_align_game-main\\gamebackground2.png"
+try:
+    background_image = pygame.image.load(background_path)
+except pygame.error as e:
+    print(f"Could not load background image: {e}")
+    background_image = None
+
 
 # Get the display info to set up dynamic window sizing
 display_info = pygame.display.Info()
@@ -89,6 +100,16 @@ BUTTON_X = 2
 # Video file path
 video_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\zymologo.mov"
 
+# Add this function after your other function definitions
+def draw_background():
+    if background_image is not None:
+        # Scale the background image to match the window size
+        scaled_background = pygame.transform.scale(background_image, (WIDTH, HEIGHT))
+        window.blit(scaled_background, (0, 0))
+    else:
+        # Fallback to white background if image couldn't be loaded
+        window.fill(WHITE)
+
 def get_score_color(score):
     """
     Returns a color tuple (R,G,B) that smoothly transitions from red to yellow to green,
@@ -127,6 +148,7 @@ def play_video(video_path):
     clip.preview()
 
 def draw_start_screen():
+    draw_background()
     window.fill(WHITE)
     draw_text("Press any key to start the game", font, BLACK, window, WIDTH // 2 - 150 * SCALE_X, HEIGHT // 2)
     pygame.display.update()
@@ -239,9 +261,12 @@ def create_glow_surface(text, font, color, alpha):
     return glow_surface
 
 def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time, showing_hint=False, optimal_position=None):
-    # Clear the main game area
-    window.fill(WHITE)
+    # Draw background instead of filling with white
+    draw_background()
     
+    base_font_size = int(50 * min(SCALE_X, SCALE_Y))  # Make this larger for bigger letters
+    base_font = pygame.font.SysFont('Arial', base_font_size)
+
     # Calculate optimal spacing and positioning
     char_width = 35 * SCALE_X
     char_height = 60 * SCALE_Y
@@ -268,7 +293,7 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
         # Draw row label
         label_x = x_start - 140 * SCALE_X
         row_y = y_start + row * row_spacing + 10
-        draw_text(f"Genome:", small_font, BLACK, window, label_x, row_y + 6)
+        draw_text(f"Genome:", small_font, BLACK, window, label_x, row_y + 10)
         
         # Draw sequence
         for i, base in enumerate(genome_subseq):
@@ -285,7 +310,7 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
                                             char_width + 4, char_height + 4)
                     pygame.draw.rect(window, YELLOW, highlight_rect)
             
-            draw_text(base, font, color, window, x_pos, row_y)
+            draw_text(base, base_font, color, window, x_pos, row_y)
             
             if (selected_position is not None and 
                 selected_position == start_idx + i and 
@@ -305,8 +330,8 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
         if row_start_idx <= alignment_start < row_end_idx:
             # Draw row label
             label_x = x_start - 140 * SCALE_X
-            glow_label = create_glow_surface("Read:", small_font, BLACK, glow_alpha)
-            window.blit(glow_label, (label_x, row_y + player_seq_y_offset +16))
+            glow_label = create_glow_surface("Read:", small_font, WHITE, glow_alpha)
+            window.blit(glow_label, (label_x, row_y + player_seq_y_offset +25))
             
             # First row of player sequence
             bases_in_row = min(row_end_idx - alignment_start, len(player_seq))
@@ -318,14 +343,14 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
                 x_pos = x_start + (offset + i) * char_width
                 
                 # Create and draw the glowing text
-                glow_surface = create_glow_surface(base, font, color, glow_alpha)
+                glow_surface = create_glow_surface(base, base_font, color, glow_alpha)  # Use base_font here
                 window.blit(glow_surface, (x_pos, row_y + player_seq_y_offset + 10))
         
         elif alignment_start <= row_start_idx < alignment_start + len(player_seq):
             # Draw row label
             label_x = x_start - 140 * SCALE_X
-            glow_label = create_glow_surface("Read:", small_font, BLACK, glow_alpha)
-            window.blit(glow_label, (label_x, row_y + player_seq_y_offset +16))
+            glow_label = create_glow_surface("Read:", small_font, WHITE, glow_alpha)
+            window.blit(glow_label, (label_x, row_y + player_seq_y_offset +25))
             
             # Middle or last row of player sequence
             seq_offset = row_start_idx - alignment_start
@@ -337,17 +362,17 @@ def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, c
                 x_pos = x_start + i * char_width
                 
                 # Create and draw the glowing text
-                glow_surface = create_glow_surface(base, font, color, glow_alpha)
+                glow_surface = create_glow_surface(base, base_font, color, glow_alpha)  # Use base_font here
                 window.blit(glow_surface, (x_pos, row_y + player_seq_y_offset + 10))
 
 
 def draw_buttons(clicked_button, score):
     # Create footer section for buttons and instructions
-    footer_height = 180 * SCALE_Y
+    footer_height = 100 * SCALE_Y
     footer_y = HEIGHT - footer_height
     
     # Clear the footer area
-    window.fill(WHITE, (0, footer_y, WIDTH, footer_height))
+    window.fill(BLACK, (0, footer_y, WIDTH, footer_height))
     
     # Calculate improved widths for layout - make buttons wider to better fit text
     button_width = 180 * SCALE_X  # Increased from 160
@@ -405,75 +430,59 @@ def draw_buttons(clicked_button, score):
     
     # Draw instructions panel
     instructions_x = exit_button_rect.right + 40 * SCALE_X
-    instructions_height = footer_height * SCALE_Y
-    instructions_y = footer_y + 10 * SCALE_Y
+    instructions_height = footer_height * 0.8  # Slightly reduced height for better appearance
+    instructions_y = footer_y + (footer_height - instructions_height) / 2  # Center vertically
     
     # Draw panel background
-    pygame.draw.rect(window, LIGHT_BLUE,
+    pygame.draw.rect(window, (200, 200, 200),
                     (instructions_x, instructions_y,
                      instructions_width, instructions_height),
                     border_radius=int(10 * min(SCALE_X, SCALE_Y)))
     
-    # Draw instructions in two columns
-    instructions = [
-        [("Movement Controls:", BLACK),
-        ("• Left Stick: Move read", BLUE),
-        ("• Right Stick: Move insertion box", BLUE)],
-        [("Editing Controls:", BLACK),
-        ("• A: Add gap at cursor", RED),
-        ("• B: Delete gap", RED),]
+    # Define all instructions with proper grouping and spacing
+    instruction_groups = [
+        {
+            "title": "Movement Controls",
+            "title_color": BLACK,
+            "items": [
+                ("Left Stick/WASD: Move sequence", BLUE),
+                ("Right Stick/Arrows: Move cursor", BLUE)
+            ]
+        },
+        {
+            "title": "Editing Controls",
+            "title_color": BLACK,
+            "items": [
+                ("A/Space: Add gap at cursor", RED),
+                ("B/Backspace: Delete gap", RED)
+            ]
+        }
     ]
     
-    # Calculate column widths and positions
+    # Calculate layout dimensions for instructions
     col_width = instructions_width / 2
-    for col_idx, column in enumerate(instructions):
-        x_offset = instructions_x + col_idx * col_width + 20 * SCALE_X
-        instruction_y = instructions_y + 15 * SCALE_Y
+    padding_x = 25 * SCALE_X
+    padding_y = SCALE_Y
+    line_height = 20 * SCALE_Y
+    
+    # Draw each instruction group
+    for col_idx, group in enumerate(instruction_groups):
+        x_offset = instructions_x + col_idx * col_width + padding_x
+        y_offset = instructions_y + padding_y
         
-        for text, color in column:
-            draw_text(text, small_font, color, window, x_offset, instruction_y)
-            instruction_y += 25 * SCALE_Y
+        # Draw group title
+        draw_text(group["title"], small_font, group["title_color"], 
+                 window, x_offset, y_offset)
+        y_offset += line_height + 5 * SCALE_Y
+        
+        # Draw instruction items with improved spacing
+        for control, color in group["items"]:
+            # Draw the control part (before the colon)
+            draw_text(f"{control}", small_font, color, 
+                     window, x_offset + 10 * SCALE_X, y_offset)
+            
+            y_offset += line_height
     
-    pygame.display.update()
-
-def draw_leaderboard(leaderboard, score, time, name, status, clicked_button):
-    window.fill(WHITE)
-    score_text = "Your final score is {} in {:.2f} seconds. ".format(score, time)
-    if status == "won":
-        score_text += "You made the leaderboard! Please enter your name: "
-        color = RED
-    else:
-        score_text += "Sorry you didn't make the leaderboard! Try again?"
-        color = BLACK
-    
-    draw_text(score_text, small_font, color, window, 50 * SCALE_X, 50 * SCALE_Y)
-    
-    if status == "won":
-        pygame.draw.rect(window, BLACK, (50 * SCALE_X, 100 * SCALE_Y, 200 * SCALE_X, 30 * SCALE_Y), 1)
-        draw_text("press Enter to confirm", small_font, BLACK, window, 275 * SCALE_X, 110 * SCALE_Y)
-        if name:
-            draw_text(name, font, BLACK, window, 55 * SCALE_X, 100 * SCALE_Y)
-    
-    y_offset = 150 * SCALE_Y
-    draw_text("Rank", font, BLACK, window, 50 * SCALE_X, y_offset)
-    draw_text("Name", font, BLACK, window, 250 * SCALE_X, y_offset)
-    draw_text("Score", font, BLACK, window, 450 * SCALE_X, y_offset)
-    draw_text("Time", font, BLACK, window, 650 * SCALE_X, y_offset)
-    
-    for i, player in enumerate(leaderboard):
-        color = GREEN if name == player["name"] else BLACK
-        row_y = (200 + 50 * i) * SCALE_Y
-        draw_text(str(i+1), font, color, window, 50 * SCALE_X, row_y)
-        draw_text(player["name"], font, color, window, 250 * SCALE_X, row_y)
-        draw_text(str(player["score"]), font, color, window, 450 * SCALE_X, row_y)
-        draw_text("{:.2f}".format(player["time"]), font, color, window, 650 * SCALE_X, row_y)
-
-    if clicked_button == "play_again":
-        pygame.draw.rect(window, (0, 0, 200), play_again_button_rect)
-    else:
-        pygame.draw.rect(window, BLUE, play_again_button_rect)
-    
-    draw_text("Play Again", font, WHITE, window, play_again_button_rect.x + 25 * SCALE_X, play_again_button_rect.y + 10 * SCALE_Y)
     pygame.display.update()
 
 def calculate_score(player_seq, genome_seq, alignment_start):
