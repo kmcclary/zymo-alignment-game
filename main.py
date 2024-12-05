@@ -97,25 +97,77 @@ def draw_text(text, font, color, surface, x, y):
     surface.blit(textobj, textrect)
 
 def generate_dna_sequence(length):
-    random.seed()
+    # Generate a random sequence of specified length
     return ''.join(random.choice('ATGC') for _ in range(length))
 
 def generate_player_sequence_from_genome(genome_seq):
-    start_idx = random.randint(0, len(genome_seq) - 55)
-    player_seq = list(genome_seq[start_idx:start_idx + random.randint(50, 55)])
-
-    while len(player_seq) > 50:
-        del player_seq[random.randint(0, len(player_seq) - 1)]
-
-    num_mutations = random.randint(0, 5)
-    for _ in range(num_mutations):
-        mutation_idx = random.randint(0, len(player_seq) - 1)
-        original_base = player_seq[mutation_idx]
-        possible_bases = [base for base in 'ATGC' if base != original_base]
-        player_seq[mutation_idx] = random.choice(possible_bases)
-
+    """
+    Generate a player sequence that requires ONLY gap insertions (no deletions) to achieve maximum score.
+    The sequence will be derived from the genome sequence with:
+    - Gaps that need to be inserted by the player (sequence is shorter than matching genome region)
+    - Some point mutations
+    - NO need for deletions
+    
+    Maximum score is fixed at 50 points:
+    - Each match = +1 point
+    - Each mismatch = -1 point
+    - Gap opening = -2 points
+    - Gap extension = -1 point
+    """
+    # Find all possible 54-base windows in the genome (we'll create a 50-base player sequence from this)
+    window_size = 54  # Larger window to accommodate the gaps we'll need
+    possible_windows = []
+    
+    for i in range(len(genome_seq) - window_size + 1):
+        window = genome_seq[i:i + window_size]
+        possible_windows.append((i, window))
+    
+    # Select a random window
+    start_idx, genome_window = random.choice(possible_windows)
+    
+    # Create player sequence by removing 4 bases (creating gaps that need to be filled)
+    # First, convert genome window to list and make a copy for the player sequence
+    genome_bases = list(genome_window)
+    player_seq = list(genome_window)
+    
+    # Select 4 positions to remove (these will need gaps added by player)
+    gap_positions = random.sample(range(len(genome_bases)), 4)
+    gap_positions.sort(reverse=True)  # Remove from end to avoid index issues
+    
+    # Remove these positions from player sequence
+    for pos in gap_positions:
+        player_seq.pop(pos)
+    
+    # Add 2 point mutations
+    # Make sure we don't mutate positions next to our gap positions
+    gap_adjacent = set()
+    for pos in gap_positions:
+        gap_adjacent.add(pos - 1)
+        gap_adjacent.add(pos)
+        gap_adjacent.add(pos + 1)
+    
+    available_positions = [i for i in range(len(player_seq)) if i not in gap_adjacent]
+    mutation_positions = random.sample(available_positions, 2)
+    
+    for pos in mutation_positions:
+        original_base = player_seq[pos]
+        possible_bases = [b for b in 'ATGC' if b != original_base]
+        player_seq[pos] = random.choice(possible_bases)
+    
+    # Now the setup for scoring 50 points:
+    # - Player sequence is 50 bases (54 - 4 removals)
+    # - Need to add 4 gaps to match genome sequence
+    # - Score breakdown:
+    #   * 48 matches (+48 points)
+    #   * 2 mismatches (-2 points)
+    #   * 4 gap openings (-8 points)
+    #   * 4 gap extensions (-4 points)
+    #   * Total = 48 - 2 - 8 - 4 = 34 points
+    # - Add 16 more bases that match perfectly to reach 50
+    extra_genome = genome_seq[start_idx + window_size:start_idx + window_size + 16]
+    player_seq.extend(list(extra_genome))
+    
     return ''.join(player_seq)
-
 def create_glow_surface(text, font, color, alpha):
     # Create text surface with the base color
     text_surface = font.render(text, True, color)
@@ -370,22 +422,30 @@ def draw_leaderboard(leaderboard, score, time, name, status, clicked_button):
     pygame.display.update()
 
 def calculate_score(player_seq, genome_seq, alignment_start):
+    """
+    Calculate alignment score:
+    Match: +1
+    Mismatch: -1
+    Gap opening: -2
+    Gap extension: -1
+    """
     score = 0
     gap_open = False
-
+    
     for i in range(len(player_seq)):
         if player_seq[i] == '-':
             if not gap_open:
-                score += GAP_OPENING
+                score += GAP_OPENING  # -2
                 gap_open = True
             else:
-                score += GAP_EXTENSION
+                score += GAP_EXTENSION  # -1
         else:
             gap_open = False
-            if player_seq[i] == genome_seq[alignment_start+i]:
-                score += MATCH
+            if player_seq[i] == genome_seq[alignment_start + i]:
+                score += MATCH  # +1
             else:
-                score += MISMATCH
+                score += MISMATCH  # -1
+                
     return score
 
 async def main():
