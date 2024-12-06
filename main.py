@@ -17,6 +17,7 @@ random.seed()
 
 # Add these after your pygame initialization code
 background_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\gamebackground2.png"
+startscreen_background_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\tutorial.png"
 logo_path = "C:\\Users\\kmccl\\Documents\\GitHub\\seq_align_game-main\\zymologo2.png"
 
 # Load both images
@@ -31,6 +32,12 @@ try:
 except pygame.error as e:
     print(f"Could not load logo image: {e}")
     logo_image = None
+
+try:
+    startscreen_background_image = pygame.image.load(startscreen_background_path)
+except pygame.error as e:
+    print(f"Could not load start screen background image: {e}")
+    startscreen_background_image = None
 
 # Add banner height constant after the other display constants
 BANNER_HEIGHT = 80  # Height of the banner in pixels
@@ -58,7 +65,7 @@ else:
 VERTICAL_PADDING = int(HEIGHT * 0.05)
 
 # Create the window - modified to use hardware acceleration
-window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+window = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
 pygame.display.set_caption("DNA Sequence Alignment")
 
 # Adjust scale factors
@@ -197,10 +204,13 @@ def play_video(video_path):
     clip.preview()
 
 def draw_start_screen():
-    draw_background()
-    window.fill(WHITE)
-    draw_banner()
-    draw_text("Press any key to start the game", font, BLACK, window, WIDTH // 2 - 150 * SCALE_X, HEIGHT // 2)
+    if background_image is not None:
+        # Scale the background image to match the window size
+        scaled_background = pygame.transform.scale(startscreen_background_image, (WIDTH, HEIGHT))
+        window.blit(scaled_background, (0, 0))
+    #window.fill(WHITE)
+    #draw_banner()
+    #draw_text("Press any key to start the game", font, BLACK, window, WIDTH // 2 - 150 * SCALE_X, HEIGHT // 2)
     pygame.display.update()
 
 def draw_text(text, font, color, surface, x, y):
@@ -688,17 +698,16 @@ async def main():
             elif event.type == pygame.VIDEORESIZE:
                 WIDTH, HEIGHT = event.size
                 current_ratio = WIDTH/HEIGHT
-    
+
                 if current_ratio > target_ratio:
                     HEIGHT = event.size[1]
                     WIDTH = int(HEIGHT * target_ratio)
                 else:
                     WIDTH = event.size[0]
                     HEIGHT = int(WIDTH / target_ratio)
-    
+
                 window = pygame.display.set_mode((WIDTH, HEIGHT), 
-                                                pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
-    
+                                            pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
                 SCALE_X = WIDTH / 1920
                 SCALE_Y = HEIGHT / 1080
     
@@ -1306,7 +1315,18 @@ async def main():
     
                     window = pygame.display.set_mode((WIDTH, HEIGHT), 
                                                     pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
-    
+                    pygame.display.set_caption("DNA Sequence Alignment")
+
+                    # Maximize the window after creation
+                    if hasattr(pygame, 'WINDOWMAXIMIZED'):  # Check if the system supports window maximization
+                        pygame.event.post(pygame.event.Event(pygame.WINDOWMAXIMIZED))
+                    else:
+                        # Alternative method for older Pygame versions
+                        import ctypes
+                        if hasattr(ctypes, 'windll'):  # Windows systems
+                            hwnd = pygame.display.get_wm_info()['window']
+                            ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE = 3
+
                     SCALE_X = WIDTH / 1920
                     SCALE_Y = HEIGHT / 1080
     
