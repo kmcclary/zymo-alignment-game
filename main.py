@@ -397,12 +397,21 @@ def create_glow_surface(text, font, color, alpha):
     
     return glow_surface
 
-def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time, showing_hint=False, optimal_position=None):
+def draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time, showing_hint=False, optimal_position=None, display_time=0):
     # Draw background instead of filling with white
     draw_background()
     draw_banner()
+
+    # ADD THIS CODE TO DRAW THE TIMER IN THE BANNER
+    elapsed_time_text = f"Time: {display_time:.2f} sec"
+    time_surface = small_font.render(elapsed_time_text, True, WHITE)
+    # Position the time text in the top-left area of the banner, with some padding
+    window.blit(time_surface, (10, (BANNER_HEIGHT - time_surface.get_height()) // 2))
+
     base_font_size = int(50 * min(SCALE_X, SCALE_Y))  # Make this larger for bigger letters
     base_font = pygame.font.SysFont('Arial', base_font_size)
+
+    # ... rest of your draw_sequences code remains unchanged ...
 
     # Calculate optimal spacing and positioning
     char_width = 35 * SCALE_X
@@ -946,13 +955,13 @@ async def main():
     while running:
         if status == "playing":
             current_time = pygame.time.get_ticks()
-            draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time, showing_hint, optimal_position)
+            draw_sequences(player_seq, genome_seq, alignment_start, selected_position, current_time, showing_hint, optimal_position, display_time=display_time)
             score = calculate_score(player_seq, genome_seq, alignment_start)
             draw_buttons(clicked_button, score)
             elapsed_time = (current_time - start_time) / 1000
             if elapsed_time - display_time >= 0.1:
                 display_time = elapsed_time
-            draw_text(f"Time: {display_time:.2f} sec", font, BLACK, window, 50 * SCALE_X, 600 * SCALE_Y)            
+            #draw_text(f"Time: {display_time:.2f} sec", font, BLACK, window, 50 * SCALE_X, 600 * SCALE_Y)            
             if len(joysticks) > 0:
                 joystick = joysticks[0]
                 x_axis = joystick.get_axis(0)  # Left/Right
