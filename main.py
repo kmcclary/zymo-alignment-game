@@ -92,6 +92,10 @@ RED = (255, 0, 0)
 LIGHT_BLUE = (173, 216, 230)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
+GOLDENROD = (218, 165, 32)
+DARKMAGENTA = (139, 0, 139)
+BRICKRED = (178, 34, 34)
+MAYABLUE = (115, 194, 251)
 
 # Colors for nucleotides
 COLORS = {
@@ -515,7 +519,7 @@ def draw_buttons(clicked_button, score):
     button_spacing = 30 * SCALE_X  # Consistent spacing between buttons
     
     # Layout: [Score] [Submit] [Play Again] [Exit] [Instructions Panel]
-    total_width = score_width + (button_width * 3) + (button_spacing * 3) + instructions_width
+    total_width = score_width + (button_width * 4) + (button_spacing * 4) + instructions_width
     start_x = (WIDTH - total_width) / 2
     
     # Helper function to center text in button
@@ -544,8 +548,15 @@ def draw_buttons(clicked_button, score):
     play_again_button_rect.update(x_pos, button_y, button_width, button_height)
     x_pos += button_width + button_spacing
     
+
+    # Instructions button
+    instructions_button_rect.update(x_pos, button_y, button_width, button_height)
+    x_pos += button_width + button_spacing
+
     # Exit button
     exit_button_rect.update(x_pos, button_y, button_width, button_height)
+    x_pos += button_width + button_spacing
+
     
     # Draw buttons with improved colors and consistent styling
     def draw_button(rect, text, base_color, highlight_color, is_clicked, text_color):
@@ -554,17 +565,18 @@ def draw_buttons(clicked_button, score):
         center_text_in_button(text, rect, text_color)
     
     # Draw all buttons using the helper function
-    draw_button(submit_button_rect, "Submit", GREEN, (0, 180, 0), 
+    draw_button(submit_button_rect, "Submit", (0, 180, 0), (0, 180, 0), 
                 clicked_button == "submit", BLACK)
-    draw_button(play_again_button_rect, "Play Again", BLUE, (0, 0, 180), 
-                clicked_button == "play_again", WHITE)
-    draw_button(exit_button_rect, "Exit Game", RED, (180, 0, 0), 
-                clicked_button == "exit", WHITE)
-    draw_button(instructions_button_rect, "Instructions", BLUE, (0, 0, 180), 
-                clicked_button == "instructions", WHITE)
+    draw_button(play_again_button_rect, "Play Again", MAYABLUE, (0, 0, 180), 
+                clicked_button == "play_again", BLACK)
+
+    draw_button(instructions_button_rect, "Instructions", GOLDENROD, (0, 0, 180), 
+                clicked_button == "instructions", BLACK)
+    draw_button(exit_button_rect, "Exit Game", BRICKRED, (180, 0, 0), 
+                clicked_button == "exit", BLACK)
     
     # Draw instructions panel
-    instructions_x = exit_button_rect.right + 40 * SCALE_X
+    instructions_x = instructions_button_rect.right + 240 * SCALE_X
     instructions_height = footer_height * 0.8  # Slightly reduced height for better appearance
     instructions_y = footer_y + (footer_height - instructions_height) / 2  # Center vertically
     
