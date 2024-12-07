@@ -76,6 +76,7 @@ SCALE_Y = HEIGHT / 1080
 submit_button_rect = pygame.Rect(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
 play_again_button_rect = pygame.Rect(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
 exit_button_rect = pygame.Rect(550 * SCALE_X, HEIGHT - 100 * SCALE_Y, 160 * SCALE_X, 50 * SCALE_Y)
+instructions_button_rect = pygame.Rect(750 * SCALE_X, HEIGHT - 100 * SCALE_Y, 180 * SCALE_X, 50 * SCALE_Y)
 
 # Update font sizes with better scaling
 font_size = int(36 * min(SCALE_X, SCALE_Y))  # Reduced from 48
@@ -203,16 +204,88 @@ def play_video(video_path):
     clip = clip.resize((video_width, video_height))
     clip.preview()
 
+def create_blinking_text_surface(text, font_size, color, current_time):
+    """
+    Creates a text surface that changes alpha based on time.
+    Returns a surface with the text at the current alpha value.
+    """
+    # Create font for the blinking text
+    blink_font = pygame.font.SysFont('Arial', font_size)
+    
+    # Calculate alpha value using sine wave for smooth blinking
+    # Complete cycle every 1000ms (1 second)
+    alpha = abs(math.sin(current_time * 0.003)) * 255
+    
+    # Create the text surface
+    text_surface = blink_font.render(text, True, color)
+    
+    # Create a surface with alpha channel
+    alpha_surface = pygame.Surface(text_surface.get_size(), pygame.SRCALPHA)
+    
+    # Set the alpha value for the entire surface
+    alpha_surface.fill((color[0], color[1], color[2], alpha))
+    
+    # Blit the text onto a new surface with alpha
+    final_surface = pygame.Surface(text_surface.get_size(), pygame.SRCALPHA)
+    final_surface.blit(text_surface, (0, 0))
+    final_surface.blit(alpha_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    
+    return final_surface
+
 def draw_start_screen():
-    if background_image is not None:
+    if startscreen_background_image is not None:
         # Scale the background image to match the window size
         scaled_background = pygame.transform.scale(startscreen_background_image, (WIDTH, HEIGHT))
         window.blit(scaled_background, (0, 0))
-    #window.fill(WHITE)
-    #draw_banner()
-    #draw_text("Press any key to start the game", font, BLACK, window, WIDTH // 2 - 150 * SCALE_X, HEIGHT // 2)
+    
+    # Draw black banner at the top
+    banner_rect = pygame.Rect(0, 0, WIDTH, BANNER_HEIGHT)
+    pygame.draw.rect(window, BLACK, banner_rect)
+    
+    # Add blinking text
+    current_time = pygame.time.get_ticks()
+    blink_font_size = int(36 * min(SCALE_X, SCALE_Y))  # Scale font size with window
+    blink_text = "Press any button to continue"
+    
+    # Create blinking text surface
+    blink_surface = create_blinking_text_surface(blink_text, blink_font_size, WHITE, current_time)
+    
+    # Center the text in the banner
+    text_x = (WIDTH - blink_surface.get_width()) // 2
+    text_y = (BANNER_HEIGHT - blink_surface.get_height()) // 2
+    
+    # Draw the blinking text
+    window.blit(blink_surface, (text_x, text_y))
+    
+    # If you have a logo, draw it as well
+    if logo_image is not None:
+        # Calculate logo dimensions (maintain aspect ratio)
+        logo_height = BANNER_HEIGHT - 4  # Leave 2px padding top and bottom
+        aspect_ratio = logo_image.get_width() / logo_image.get_height()
+        logo_width = int(logo_height * aspect_ratio)
+        
+        try:
+            # Convert image to RGB mode if needed
+            if logo_image.get_bitsize() != 32:
+                temp_surface = pygame.Surface((logo_image.get_width(), logo_image.get_height()), pygame.SRCALPHA)
+                temp_surface.blit(logo_image, (0, 0))
+                logo_image_rgb = temp_surface
+            else:
+                logo_image_rgb = logo_image
+            
+            # Scale the logo
+            scaled_logo = pygame.transform.smoothscale(logo_image_rgb, (logo_width, logo_height))
+        except:
+            scaled_logo = pygame.transform.scale(logo_image, (logo_width, logo_height))
+        
+        # Position logo on far right with padding
+        logo_x = WIDTH - logo_width - 5
+        logo_y = 2
+        
+        # Draw logo
+        window.blit(scaled_logo, (logo_x, logo_y))
+    
     pygame.display.update()
-
 def draw_text(text, font, color, surface, x, y):
     textobj = font.render(text, True, color)
     textrect = textobj.get_rect()
@@ -487,6 +560,8 @@ def draw_buttons(clicked_button, score):
                 clicked_button == "play_again", WHITE)
     draw_button(exit_button_rect, "Exit Game", RED, (180, 0, 0), 
                 clicked_button == "exit", WHITE)
+    draw_button(instructions_button_rect, "Instructions", BLUE, (0, 0, 180), 
+                clicked_button == "instructions", WHITE)
     
     # Draw instructions panel
     instructions_x = exit_button_rect.right + 40 * SCALE_X
@@ -543,6 +618,46 @@ def draw_buttons(clicked_button, score):
             
             y_offset += line_height
     
+    pygame.display.update()
+
+def draw_leaderboard(leaderboard, score, time, name, status, clicked_button):
+    window.fill(WHITE)
+    score_text = "Your final score is {} in {:.2f} seconds. ".format(score, time)
+    if status == "won":
+        score_text += "You made the leaderboard! Please enter your name: "
+        color = RED
+    else:
+        score_text += "Sorry you didn't make the leaderboard! Try again?"
+        color = BLACK
+    
+    draw_text(score_text, small_font, color, window, 50 * SCALE_X, 50 * SCALE_Y)
+    
+    if status == "won":
+        pygame.draw.rect(window, BLACK, (50 * SCALE_X, 100 * SCALE_Y, 200 * SCALE_X, 30 * SCALE_Y), 1)
+        draw_text("press Enter to confirm", small_font, BLACK, window, 275 * SCALE_X, 110 * SCALE_Y)
+        if name:
+            draw_text(name, font, BLACK, window, 55 * SCALE_X, 100 * SCALE_Y)
+    
+    y_offset = 150 * SCALE_Y
+    draw_text("Rank", font, BLACK, window, 50 * SCALE_X, y_offset)
+    draw_text("Name", font, BLACK, window, 250 * SCALE_X, y_offset)
+    draw_text("Score", font, BLACK, window, 450 * SCALE_X, y_offset)
+    draw_text("Time", font, BLACK, window, 650 * SCALE_X, y_offset)
+    
+    for i, player in enumerate(leaderboard):
+        color = GREEN if name == player["name"] else BLACK
+        row_y = (200 + 50 * i) * SCALE_Y
+        draw_text(str(i+1), font, color, window, 50 * SCALE_X, row_y)
+        draw_text(player["name"], font, color, window, 250 * SCALE_X, row_y)
+        draw_text(str(player["score"]), font, color, window, 450 * SCALE_X, row_y)
+        draw_text("{:.2f}".format(player["time"]), font, color, window, 650 * SCALE_X, row_y)
+
+    if clicked_button == "play_again":
+        pygame.draw.rect(window, (0, 0, 200), play_again_button_rect)
+    else:
+        pygame.draw.rect(window, BLUE, play_again_button_rect)
+    
+    draw_text("Play Again", font, WHITE, window, play_again_button_rect.x + 25 * SCALE_X, play_again_button_rect.y + 10 * SCALE_Y)
     pygame.display.update()
 
 def calculate_score(player_seq, genome_seq, alignment_start):
@@ -1136,6 +1251,72 @@ async def main():
                         input_active = False
                         button_x_last_press = current_time
 
+                if joystick.get_button(BUTTON_X) and joystick.get_button(BUTTON_Y):  # Press X+Y together to restart
+                    current_time = pygame.time.get_ticks()
+                    if current_time - button_x_last_press >= button_cooldown:
+                        clicked_button = "instructions"
+                        # Reset everything and go back to start screen
+                        genome_seq = generate_dna_sequence(250)
+                        player_seq = generate_player_sequence_from_genome(genome_seq)
+                        alignment_start = 0
+                        selected_position = None
+                        start_time = pygame.time.get_ticks()
+                        display_time = 0
+                        final_score = 0
+                        final_time = 10000
+                        player_name = ""
+                        showing_hint = False
+                        optimal_position = None
+                        status = "start"
+                        input_active = False
+                        draw_start_screen()
+                        waiting_for_start = True
+                        while waiting_for_start:
+                            current_time = pygame.time.get_ticks()
+                            # Only check for inputs if enough time has passed
+                            if current_time - last_input_time >= input_cooldown:
+                                # Check for controller button presses
+                                if len(joysticks) > 0:
+                                    joystick = joysticks[0]
+                                    for i in range(joystick.get_numbuttons()):
+                                        if joystick.get_button(i):
+                                            waiting_for_start = False
+                                            last_input_time = current_time
+                                            break
+                            for event in pygame.event.get():
+                                if event.type == pygame.QUIT:
+                                    pygame.quit()
+                                    exit()
+                                elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                                    waiting_for_start = False
+                                elif event.type == pygame.VIDEORESIZE:
+                                    WIDTH, HEIGHT = event.size
+                                    current_ratio = WIDTH/HEIGHT
+                        
+                                    if current_ratio > target_ratio:
+                                        HEIGHT = event.size[1]
+                                        WIDTH = int(HEIGHT * target_ratio)
+                                    else:
+                                        WIDTH = event.size[0]
+                                        HEIGHT = int(WIDTH / target_ratio)
+                        
+                                    window = pygame.display.set_mode((WIDTH, HEIGHT), 
+                                                                    pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+                        
+                                    SCALE_X = WIDTH / 1920
+                                    SCALE_Y = HEIGHT / 1080
+                        
+                                    # Update font sizes with better scaling
+                                    font_size = int(36 * min(SCALE_X, SCALE_Y))
+                                    small_font_size = int(24 * min(SCALE_X, SCALE_Y))
+                                    font = pygame.font.SysFont('Arial', font_size)
+                                    small_font = pygame.font.SysFont('Arial', small_font_size)
+                        
+                                    # Update button positions
+                                    submit_button_rect.update(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
+                                    play_again_button_rect.update(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
+                                    exit_button_rect.update(550 * SCALE_X, HEIGHT - 100 * SCALE_Y, 160 * SCALE_X, 50 * SCALE_Y)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -1169,6 +1350,67 @@ async def main():
                     elif exit_button_rect.collidepoint(mouse_pos):
                         clicked_button = "exit"
                         running = False  # This will exit the game
+                    elif instructions_button_rect.collidepoint(mouse_pos):
+                        clicked_button = "instructions"
+                        # Reset everything but ensure we go back to playing state
+                        genome_seq = generate_dna_sequence(250)
+                        player_seq = generate_player_sequence_from_genome(genome_seq)
+                        alignment_start = 0
+                        selected_position = None
+                        start_time = pygame.time.get_ticks()
+                        display_time = 0
+                        showing_hint = False
+                        optimal_position = None
+                        input_active = False
+                        
+                        # Show instructions screen
+                        draw_start_screen()
+                        waiting_for_start = True
+                        
+                        while waiting_for_start:
+                            current_time = pygame.time.get_ticks()
+                            if current_time - last_input_time >= input_cooldown:
+                                if len(joysticks) > 0:
+                                    joystick = joysticks[0]
+                                    for i in range(joystick.get_numbuttons()):
+                                        if joystick.get_button(i):
+                                            waiting_for_start = False
+                                            last_input_time = current_time
+                                            break
+                            
+                            for event in pygame.event.get():
+                                if event.type == pygame.QUIT:
+                                    pygame.quit()
+                                    exit()
+                                elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                                    waiting_for_start = False
+                                elif event.type == pygame.VIDEORESIZE:
+                                    WIDTH, HEIGHT = event.size
+                                    current_ratio = WIDTH/HEIGHT
+                        
+                                    if current_ratio > target_ratio:
+                                        HEIGHT = event.size[1]
+                                        WIDTH = int(HEIGHT * target_ratio)
+                                    else:
+                                        WIDTH = event.size[0]
+                                        HEIGHT = int(WIDTH / target_ratio)
+                        
+                                    window = pygame.display.set_mode((WIDTH, HEIGHT), 
+                                                                    pygame.RESIZABLE | pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+                        
+                                    SCALE_X = WIDTH / 1920
+                                    SCALE_Y = HEIGHT / 1080
+                        
+                                    # Update font sizes with better scaling
+                                    font_size = int(36 * min(SCALE_X, SCALE_Y))
+                                    small_font_size = int(24 * min(SCALE_X, SCALE_Y))
+                                    font = pygame.font.SysFont('Arial', font_size)
+                                    small_font = pygame.font.SysFont('Arial', small_font_size)
+                        
+                                    # Update button positions
+                                    submit_button_rect.update(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
+                                    play_again_button_rect.update(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
+                                    exit_button_rect.update(550 * SCALE_X, HEIGHT - 100 * SCALE_Y, 160 * SCALE_X, 50 * SCALE_Y)
                 elif event.type == pygame.MOUSEBUTTONUP:
                     clicked_button = None
                 elif event.type == pygame.KEYDOWN:
