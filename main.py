@@ -633,7 +633,11 @@ def draw_buttons(clicked_button, score):
     pygame.display.update()
 
 def draw_leaderboard(leaderboard, score, time, name, status, clicked_button):
-    window.fill(WHITE)
+    # Clear screen with background
+    draw_background()
+    draw_banner()
+    
+    # Draw score text
     score_text = "Your final score is {} in {:.2f} seconds. ".format(score, time)
     if status == "won":
         score_text += "You made the leaderboard! Please enter your name: "
@@ -642,36 +646,60 @@ def draw_leaderboard(leaderboard, score, time, name, status, clicked_button):
         score_text += "Sorry you didn't make the leaderboard! Try again?"
         color = BLACK
     
-    draw_text(score_text, small_font, color, window, 50 * SCALE_X, 50 * SCALE_Y)
+    draw_text(score_text, small_font, color, window, 50 * SCALE_X, BANNER_HEIGHT + (30 * SCALE_Y))
     
+    # Draw name input box if won
     if status == "won":
-        pygame.draw.rect(window, BLACK, (50 * SCALE_X, 100 * SCALE_Y, 200 * SCALE_X, 30 * SCALE_Y), 1)
-        draw_text("press Enter to confirm", small_font, BLACK, window, 275 * SCALE_X, 110 * SCALE_Y)
+        pygame.draw.rect(window, BLACK, (50 * SCALE_X, BANNER_HEIGHT + (80 * SCALE_Y), 200 * SCALE_X, 30 * SCALE_Y), 1)
+        draw_text("press Enter to confirm", small_font, BLACK, window, 275 * SCALE_X, BANNER_HEIGHT + (85 * SCALE_Y))
         if name:
-            draw_text(name, font, BLACK, window, 55 * SCALE_X, 100 * SCALE_Y)
+            draw_text(name, font, BLACK, window, 55 * SCALE_X, BANNER_HEIGHT + (80 * SCALE_Y))
     
-    y_offset = 150 * SCALE_Y
+    # Draw leaderboard headers
+    y_offset = BANNER_HEIGHT + (130 * SCALE_Y)
     draw_text("Rank", font, BLACK, window, 50 * SCALE_X, y_offset)
     draw_text("Name", font, BLACK, window, 250 * SCALE_X, y_offset)
     draw_text("Score", font, BLACK, window, 450 * SCALE_X, y_offset)
     draw_text("Time", font, BLACK, window, 650 * SCALE_X, y_offset)
     
+    # Draw leaderboard entries
     for i, player in enumerate(leaderboard):
         color = GREEN if name == player["name"] else BLACK
-        row_y = (200 + 50 * i) * SCALE_Y
+        row_y = BANNER_HEIGHT + (180 + 50 * i) * SCALE_Y
         draw_text(str(i+1), font, color, window, 50 * SCALE_X, row_y)
         draw_text(player["name"], font, color, window, 250 * SCALE_X, row_y)
         draw_text(str(player["score"]), font, color, window, 450 * SCALE_X, row_y)
         draw_text("{:.2f}".format(player["time"]), font, color, window, 650 * SCALE_X, row_y)
 
-    if clicked_button == "play_again":
-        pygame.draw.rect(window, (0, 0, 200), play_again_button_rect)
-    else:
-        pygame.draw.rect(window, BLUE, play_again_button_rect)
-    
-    draw_text("Play Again", font, WHITE, window, play_again_button_rect.x + 25 * SCALE_X, play_again_button_rect.y + 10 * SCALE_Y)
-    pygame.display.update()
+    # Calculate button positions at the bottom of the screen
+    button_y = HEIGHT - (100 * SCALE_Y)
+    button_width = 200 * SCALE_X
+    button_height = 50 * SCALE_Y
+    spacing = 50 * SCALE_X
 
+    total_width = (button_width * 2) + spacing
+    start_x = (WIDTH - total_width) / 2
+
+    # Update the global button rects
+    play_again_button_rect.update(start_x, button_y, button_width, button_height)
+    exit_button_rect.update(start_x + button_width + spacing, button_y, button_width, button_height)
+        
+    # Draw Play Again button
+    button_color = (0, 0, 200) if clicked_button == "play_again" else BLUE
+    pygame.draw.rect(window, button_color, play_again_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
+    text_surface = font.render("Play Again", True, WHITE)
+    text_rect = text_surface.get_rect(center=play_again_button_rect.center)
+    window.blit(text_surface, text_rect)
+    
+    # Draw Exit button
+    button_color = (180, 0, 0) if clicked_button == "exit" else BRICKRED
+    pygame.draw.rect(window, button_color, exit_button_rect, border_radius=int(10 * min(SCALE_X, SCALE_Y)))
+    text_surface = font.render("Exit Game", True, WHITE)
+    text_rect = text_surface.get_rect(center=exit_button_rect.center)
+    window.blit(text_surface, text_rect)
+    
+    pygame.display.update()
+    
 def calculate_score(player_seq, genome_seq, alignment_start):
     """
     Calculate alignment score with bounds checking:
@@ -1500,31 +1528,33 @@ async def main():
                     submit_button_rect.update(50 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
                     play_again_button_rect.update(300 * SCALE_X, HEIGHT - 100 * SCALE_Y, 200 * SCALE_X, 50 * SCALE_Y)
                     exit_button_rect.update(550 * SCALE_X, HEIGHT - 100 * SCALE_Y, 160 * SCALE_X, 50 * SCALE_Y)
-        else:
+        elif status in ["won", "lost"]:
             draw_leaderboard(leaderboard, final_score, final_time, player_name, status, clicked_button)
+            
             for event in pygame.event.get():
-                if len(joysticks) > 0:
-                    joystick = joysticks[0]
-                    if joystick.get_button(BUTTON_X):
-                        current_time = pygame.time.get_ticks()
-                        if current_time - button_x_last_press >= button_cooldown:
-                            clicked_button = "play_again"
-                            genome_seq = generate_dna_sequence(250)
-                            player_seq = generate_player_sequence_from_genome(genome_seq)
-                            alignment_start = 0
-                            selected_position = None
-                            start_time = pygame.time.get_ticks()
-                            display_time = 0
-                            final_score = 0
-                            final_time = 10000
-                            player_name = ""
-                            showing_hint = False
-                            optimal_position = None
-                            status = "playing"
-                            input_active = False
-                            button_x_last_press = current_time
-                elif event.type == pygame.QUIT:
+                if event.type == pygame.QUIT:
                     running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    mouse_pos = pygame.mouse.get_pos()
+                    if play_again_button_rect.collidepoint(mouse_pos):
+                        clicked_button = "play_again"
+                        # Reset game state and start over
+                        genome_seq = generate_dna_sequence(250)
+                        player_seq = generate_player_sequence_from_genome(genome_seq)
+                        alignment_start = 0
+                        selected_position = None
+                        start_time = pygame.time.get_ticks()
+                        final_score = 0
+                        final_time = 10000
+                        player_name = ""
+                        showing_hint = False
+                        optimal_position = None
+                        status = "playing"
+                        input_active = False
+                    elif exit_button_rect.collidepoint(mouse_pos):
+                        clicked_button = "exit"
+                        running = False
+                # Handle other keys if needed
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     mouse_pos = pygame.mouse.get_pos()
                     if play_again_button_rect.collidepoint(mouse_pos):
